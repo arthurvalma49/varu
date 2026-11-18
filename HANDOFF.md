@@ -65,5 +65,6 @@ Known gaps:
 - One motion system in `src/index.css`: Apple springs (WWDC23 "Animate with springs", duration + bounce) sampled into CSS `linear()` as `--spring-smooth|snappy|bouncy|quick` with matching `--dur-*`. Use these, not ad-hoc cubic-beziers.
 - Touch feedback as in UIKit: `.press` (row highlight), `.tap` (dim), `.glass-btn` / `.tab-btn` (Liquid Glass flex: scale up and brighten, spring back). Highlights appear instantly on touch-down and fade on release. `main.tsx` adds an empty touchstart listener because iOS Safari otherwise never applies `:active`.
 - Sheets slide up over a dimmed page; the page behind no longer zooms out. Segmented and tab pills slide; the switch knob stretches while held.
-- `src/ui/haptics.ts`: light haptic on Android (vibrate) and iOS 18+ (hidden native switch). Fired on Puudun, swipe and action-sheet actions, long press and switches.
+- Haptics (tested on a real iPhone): iOS only plays a haptic when the user's own tap flips a native `<input type=checkbox switch>`; flipping it from code does nothing. So `HapticButton` (kit.tsx) is a label with a hidden switch inside, `Button haptic` uses it, and `Switch` is a real native switch. Used on Puudun, Salvesta/Planeeri, swipe and action-sheet actions, calendar days. `haptics.ts` is Android vibrate only.
+- Sheets and action sheets start below the status bar: any layer appearing over the top edge made Safari re-tint the status bar (brief flash, seen on device in every variant).
 

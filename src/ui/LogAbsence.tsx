@@ -418,7 +418,7 @@ export function LogAbsence({
             <div role="status" className={`flex-1 min-w-0 text-[15px] leading-tight font-medium ${!p.total || !p.counts ? "text-muted" : goesOver ? "text-bad" : "text-ok"}`}>
               {verdict}
             </div>
-            <Button variant={goesOver ? "danger" : "primary"} onClick={save} disabled={!p.total} className="shrink-0">
+            <Button haptic variant={goesOver ? "danger" : "primary"} onClick={save} disabled={!p.total} className="shrink-0">
               {goesOver ? `${action} ikkagi` : action}
             </Button>
           </>

@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { haptic } from "./haptics";
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type PointerEvent as RPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type PointerEvent as RPointerEvent, type ReactNode } from "react";
 import { fractionToPct } from "../core/calc";
 import type { Fraction, Rule, Status } from "../core/types";
 
@@ -217,12 +217,73 @@ export function Row({
 
 /* ---------- Controls ---------- */
 
+/**
+ * A button that gives a haptic tap on iPhone. Safari only plays haptics when the user's own tap
+ * flips a native switch, so this is a <label> with a hidden switch inside: the tap toggles the
+ * switch (haptic) and runs onClick. Behaves like a button for keyboard and screen readers.
+ */
+export function HapticButton({
+  onClick,
+  disabled,
+  className = "",
+  children,
+  ...rest
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+  children: ReactNode;
+  "aria-label"?: string;
+  "aria-pressed"?: boolean;
+  tabIndex?: number;
+  "data-iso"?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <label
+      role="button"
+      tabIndex={disabled ? -1 : (rest.tabIndex ?? 0)}
+      aria-disabled={disabled || undefined}
+      aria-label={rest["aria-label"]}
+      aria-pressed={rest["aria-pressed"]}
+      data-iso={rest["data-iso"]}
+      style={rest.style}
+      data-disabled={disabled || undefined}
+      className={`relative select-none ${disabled ? "pointer-events-none" : "cursor-pointer"} ${className}`}
+      onClick={() => {
+        if (disabled) return;
+        haptic();
+        onClick?.();
+      }}
+      onKeyDown={(e) => {
+        if (disabled || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        onClick?.();
+      }}
+    >
+      {children}
+      <input
+        type="checkbox"
+        // @ts-expect-error: Safari's native switch attribute
+        switch=""
+        tabIndex={-1}
+        aria-hidden
+        disabled={disabled}
+        // The label forwards a second click to the input; stop it so onClick runs once.
+        onClick={(e) => e.stopPropagation()}
+        className="absolute opacity-0 pointer-events-none size-px"
+      />
+    </label>
+  );
+}
+
 export function Button({
   variant = "primary",
   size = "md",
   className = "",
+  haptic: withHaptic,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" | "quiet"; size?: "md" | "lg" }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" | "quiet"; size?: "md" | "lg"; haptic?: boolean }) {
   const v = {
     primary: "bg-accent text-accent-ink",
     ghost: "bg-accent-soft text-accent",
@@ -230,13 +291,19 @@ export function Button({
     quiet: "bg-transparent text-accent",
   }[variant];
   const s = size === "lg" ? "min-h-[52px] px-6 rounded-full text-[17px]" : "min-h-11 px-5 rounded-full text-[15px]";
-  return (
-    <button
-      type="button"
-      className={`${s} tap font-semibold cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${v} ${className}`}
-      {...rest}
-    />
-  );
+  const cls = `${s} tap font-semibold cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${v} ${className}`;
+  if (withHaptic)
+    return (
+      <HapticButton
+        onClick={rest.onClick ? () => rest.onClick!(undefined as never) : undefined}
+        disabled={rest.disabled}
+        aria-label={rest["aria-label"]}
+        className={`inline-flex items-center justify-center ${cls} ${rest.disabled ? "opacity-35" : ""}`}
+      >
+        {rest.children}
+      </HapticButton>
+    );
+  return <button type="button" className={cls} {...rest} />;
 }
 
 /** iOS segmented control. */
@@ -437,22 +504,17 @@ export function Sheet({
   title,
   trailing,
   children,
-  lockScroll = true,
-  backdrop = "full",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   trailing?: ReactNode;
   children: ReactNode;
-  /** Test variants (Seaded > Testimine). */
-  lockScroll?: boolean;
-  backdrop?: "full" | "below" | "none";
 }) {
   const { mounted, shown } = usePresence(open, 450);
   const [drag, setDrag] = useState(0);
   const start = useRef<{ y: number; t: number } | null>(null);
-  useScrollLock(open && lockScroll);
+  useScrollLock(open);
   useEffect(() => {
     if (!open) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -474,15 +536,12 @@ export function Sheet({
   };
   // Rendered at the top of the page so the tab bar never covers it.
   return createPortal(
-    <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={title}>
-      {backdrop !== "none" && (
-        <div
-          className={`backdrop absolute inset-x-0 bottom-0 bg-black/40 ${backdrop === "below" ? "top-[env(safe-area-inset-top)]" : "top-0"} ${shown ? "opacity-100" : "opacity-0"}`}
-          onClick={onClose}
-        />
-      )}
+    <div className="fixed inset-x-0 bottom-0 top-[max(env(safe-area-inset-top),2px)] z-40" role="dialog" aria-modal="true" aria-label={title}>
+      {/* The dialog starts below the status bar: a layer appearing over the top edge makes
+          Safari re-tint the status bar area, which showed as a brief flash (tested on device). */}
+      <div className={`backdrop absolute inset-0 bg-black/40 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
       <div
-        className={`sheet ${shown ? "" : "closing"} absolute inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+30px)] max-w-[640px] mx-auto bg-bg rounded-t-[26px] shadow-[0_-10px_40px_rgb(0_0_0/0.25)] flex flex-col overflow-hidden`}
+        className={`sheet ${shown ? "" : "closing"} absolute inset-x-0 bottom-0 top-[28px] max-w-[640px] mx-auto bg-bg rounded-t-[26px] shadow-[0_-10px_40px_rgb(0_0_0/0.25)] flex flex-col overflow-hidden`}
         style={{ transform: shown ? `translateY(${drag}px)` : "translateY(100%)", transition: drag ? "none" : undefined }}
       >
         <div className="shrink-0 touch-none cursor-grab" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
@@ -515,7 +574,7 @@ export function ActionSheet({ open, onClose, title, message, actions }: { open: 
   useScrollLock(open);
   if (!mounted) return null;
   return createPortal(
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title ?? "Valikud"}>
+    <div className="fixed inset-x-0 bottom-0 top-[max(env(safe-area-inset-top),2px)] z-50" role="dialog" aria-modal="true" aria-label={title ?? "Valikud"}>
       <div className={`backdrop absolute inset-0 bg-black/35 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
       <div
         className={`sheet ${shown ? "" : "closing"} absolute inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+8px)] max-w-[480px] mx-auto flex flex-col gap-2`}
@@ -529,18 +588,16 @@ export function ActionSheet({ open, onClose, title, message, actions }: { open: 
             </div>
           )}
           {actions.map((a, i) => (
-            <button
+            <HapticButton
               key={i}
-              type="button"
               onClick={() => {
                 onClose();
-                haptic();
                 a.onClick();
               }}
-              className={`press w-full min-h-[56px] px-4 text-[19px] cursor-pointer ${i ? "border-t border-line" : ""} ${a.destructive ? "text-bad" : "text-accent"} ${a.bold ? "font-semibold" : ""}`}
+              className={`press w-full min-h-[56px] px-4 text-[19px] flex items-center justify-center text-center ${i ? "border-t border-line" : ""} ${a.destructive ? "text-bad" : "text-accent"} ${a.bold ? "font-semibold" : ""}`}
             >
               {a.label}
-            </button>
+            </HapticButton>
           ))}
         </div>
         <button type="button" onClick={onClose} className="glass press w-full min-h-[56px] rounded-[16px] text-[19px] font-semibold text-accent cursor-pointer">
@@ -638,21 +695,19 @@ export function SwipeRow({ actions, children, className = "", ...rest }: { actio
     <div ref={rowRef} className={`cell relative overflow-hidden ${className}`} {...rest}>
       <div className="absolute inset-y-0 right-0 flex" style={{ width: W }} aria-hidden={!openRow}>
         {actions.map((a) => (
-          <button
+          <HapticButton
             key={a.label}
-            type="button"
             tabIndex={openRow ? 0 : -1}
             onClick={() => {
               setOpenRow(false);
               setX(0);
-              haptic();
               a.onClick();
             }}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 text-white text-[13px] font-medium cursor-pointer ${SWIPE_TONE[a.tone]}`}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 text-white text-[13px] font-medium ${SWIPE_TONE[a.tone]}`}
           >
             {a.icon && <Icon name={a.icon} size={20} />}
             {a.label}
-          </button>
+          </HapticButton>
         ))}
       </div>
       <div
@@ -820,7 +875,6 @@ function Calendar({
   const dayAt = (x: number, y: number) => (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>("[data-iso]")?.dataset.iso;
 
   const tap = (iso: string) => {
-    haptic();
     if (!range) return onPick?.(iso);
     if (!pending.current || iso < lo) {
       pending.current = true;
@@ -909,9 +963,8 @@ function Calendar({
                 isEnd ? "right-1/2" : col === 6 || i === days - 1 ? "right-[2px] rounded-r-full" : "right-0"
               }`;
           return (
-            <button
+            <HapticButton
               key={iso}
-              type="button"
               data-iso={iso}
               disabled={off}
               aria-pressed={sel || !!inside}
@@ -920,7 +973,7 @@ function Calendar({
                 if (justDragged.current) return;
                 tap(iso);
               }}
-              className="group relative grid place-items-center h-11 cursor-pointer disabled:cursor-default"
+              className="group grid place-items-center h-11"
             >
               {hasBand && <span aria-hidden className={`absolute top-[2px] bottom-[2px] bg-accent-soft ${bandCls}`} />}
               <span
@@ -940,7 +993,7 @@ function Calendar({
               >
                 {i + 1}
               </span>
-            </button>
+            </HapticButton>
           );
         })}
       </div>

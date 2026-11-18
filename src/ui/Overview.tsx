@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from "react";
-import { haptic } from "./haptics";
 import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, missableOn, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
@@ -251,7 +250,6 @@ export function Overview({
               const askHalf = () => setSheet({ title: `${name(b.subjectId)}: paaristund`, message: "Millest puudud?", actions: skipActions });
               const skip = () => {
                 if (remaining > 1) return askHalf();
-                haptic();
                 onLogLesson(focus, b.subjectId, remaining);
               };
               const openMore = () => setSheet({ title: `${name(b.subjectId)}${t ? `, ${t.start}` : ""}`, message: status, actions: done ? cancelActions : [...skipActions, ...cancelActions] });
@@ -281,6 +279,7 @@ export function Overview({
                     ) : (
                       <>
                         <Button
+                          haptic
                           variant={ok || oneOnly ? "ghost" : "quiet"}
                           className={`shrink-0 min-h-9 min-w-[86px] px-3.5 text-[15px] ${ok || oneOnly ? "" : "text-bad"}`}
                           onClick={skip}
