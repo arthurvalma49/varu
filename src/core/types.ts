@@ -69,6 +69,12 @@ export interface Setup {
   segments: Segment[];
   /** No-lesson days inside segments (holidays, school events). */
   holidays: ISODate[];
+  /**
+   * Lessons that did not or will not take place (teacher ill, school event), by date and subject:
+   * { "2026-11-25": { fuusika: 2 } }. They lower the totals, so they can also lower what is allowed.
+   * Not absences.
+   */
+  cancelled?: Record<ISODate, Record<string, number>>;
   /** Bell times by lesson number ("1" -> 09:00-09:40), when known (EduPage import, RAM). */
   periodTimes?: Record<string, { start: string; end: string }>;
 }

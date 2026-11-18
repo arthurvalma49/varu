@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { missableOn, summary } from "./core/calc";
+import { missableOn, summary, withCancelled } from "./core/calc";
 import { today } from "./core/dates";
 import { decodeSetup } from "./core/share";
 import type { Absence, Setup } from "./core/types";
@@ -10,10 +10,10 @@ import { Onboarding } from "./ui/Onboarding";
 import { Overview } from "./ui/Overview";
 import { Settings } from "./ui/Settings";
 import { ShareCard } from "./ui/ShareCard";
-import { Button, Icon, LargeTitle, cap, fmtDate, fmtLong, tunde } from "./ui/kit";
+import { Button, Icon, LargeTitle, cap, fmtDate, fmtLong, joinEt, tunde } from "./ui/kit";
 
 type Tab = "overview" | "log" | "history" | "settings";
-const TITLES: Record<Tab, string> = { overview: "Täna", log: "Lisa puudumine", history: "Ajalugu", settings: "Seaded" };
+const TITLES: Record<Tab, string> = { overview: "Täna", log: "Lisa", history: "Ajalugu", settings: "Seaded" };
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "overview", label: "Täna", icon: "M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm3 8h2m4 0h2m-8 4h2" },
   { id: "log", label: "Lisa", icon: "M12 8v8M8 12h8M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
@@ -104,6 +104,25 @@ export default function App() {
       setToast({ text, undo: () => removeAbsence(a.id), key: Date.now() });
     }
   };
+  /**
+   * Cancelled lessons (k > 0 adds, k < 0 restores). They lower totals, so the toast says when that
+   * also lowers how many absences a subject allows.
+   */
+  const changeCancelled = (date: string, changes: Record<string, number>, label: string) => {
+    if (!data.setup) return;
+    const prev = data.setup.cancelled;
+    const next = { ...data.setup, cancelled: withCancelled(prev, date, changes) };
+    const before = new Map(rows.map((r) => [r.subject.id, r.max]));
+    const fewer = summary(next, data.absences, now)
+      .filter((r) => (before.get(r.subject.id) ?? r.max) > r.max)
+      .map((r) => r.subject.name);
+    store.updateSetup((d) => void (d.cancelled = next.cancelled));
+    setToast({
+      text: fewer.length ? `${label} ${joinEt(fewer)}: lubatud puudumisi 1 võrra vähem.` : label,
+      undo: () => store.updateSetup((d) => void (d.cancelled = prev ? structuredClone(prev) : undefined)),
+      key: Date.now(),
+    });
+  };
   const removed = (id: string) => {
     const a = data.absences.find((x) => x.id === id);
     removeAbsence(id);
@@ -184,7 +203,8 @@ export default function App() {
             <div className="flex gap-2">
               <Button
                 onClick={() => {
-                  replaceAll({ ...data, setup: incoming });
+                  // A classmate's setup replaces yours, but your marked cancellations stay.
+                  replaceAll({ ...data, setup: { ...incoming, cancelled: incoming.cancelled ?? data.setup!.cancelled } });
                   setIncoming(null);
                   clearHash();
                 }}
@@ -213,9 +233,24 @@ export default function App() {
             onLog={() => go("log")}
             onSkipDay={skipDay}
             onLogLesson={logLesson}
+            onCancel={changeCancelled}
           />
         )}
-        {tab === "log" && <LogAbsence setup={data.setup} rows={rows} now={now} onSave={logged} onSaveMany={loggedMany} />}
+        {tab === "log" && (
+          <LogAbsence
+            setup={data.setup}
+            rows={rows}
+            absences={data.absences}
+            now={now}
+            onSave={logged}
+            onSaveMany={loggedMany}
+            onCancel={(date, changes, label) => {
+              changeCancelled(date, changes, label);
+              setTab("overview");
+              window.scrollTo({ top: 0 });
+            }}
+          />
+        )}
         {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onUpdate={updateAbsence} onImport={addAbsences} />}
         {tab === "settings" && <Settings store={store} />}
       </main>
@@ -224,12 +259,12 @@ export default function App() {
         <div
           key={toast.key}
           role="status"
-          className="toast-in fixed z-20 inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+82px)] max-w-[420px] mx-auto rounded-full bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-2.5 pr-1.5 py-1.5 flex items-center gap-2.5 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
+          className="toast-in fixed z-20 inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+82px)] max-w-[420px] mx-auto rounded-[24px] bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-2.5 pr-1.5 py-1.5 flex items-center gap-2.5 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
         >
           <span className="shrink-0 size-6 rounded-full bg-[#30d158] text-black grid place-items-center">
             <Icon name="check" size={14} stroke={3} />
           </span>
-          <span className="flex-1 min-w-0 text-[15px] num truncate">{toast.text}</span>
+          <span className="flex-1 min-w-0 text-[15px] leading-snug num py-1.5">{toast.text}</span>
           {toast.undo && (
             <button
               type="button"

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, missableOn, nextLesson, nextSchoolDay, planningSegment } from "../core/calc";
+import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, missableOn, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
 import { Button, Card, Empty, Icon, Meter, Pill, Row, Section, WD_ON, WD_SHORT, cap, fmtDate, fmtLimit, joinEt, leftLabel, limitPhrase, pct, tunde } from "./kit";
@@ -15,6 +15,7 @@ export function Overview({
   onLog,
   onSkipDay,
   onLogLesson,
+  onCancel,
 }: {
   setup: Setup;
   rows: SubjectRow[];
@@ -23,8 +24,10 @@ export function Overview({
   onLog: () => void;
   onSkipDay: (date: string) => void;
   onLogLesson: (date: string, subjectId: string, count: number) => void;
+  onCancel: (date: string, changes: Record<string, number>, label: string) => void;
 }) {
   const [showCalm, setShowCalm] = useState(false);
+  const [menu, setMenu] = useState<number | null>(null);
 
   if (!rows.length)
     return (
@@ -144,60 +147,127 @@ export function Overview({
       </Card>
 
       {/* The focus day's lessons, one by one */}
-      {focus && focusBlocks.length > 0 && (
-        <Section title={`${dayWord}, ${fmtDate(focus)}`} footer="Võid = selle tunni võid vahele jätta ja jääd piiri sisse. Paaristund võtab 2 tundi varu.">
-          {focusBlocks.map((b, i) => {
-            if (b.selfStudy)
+      {focus && timetableOn(setup, focus).length > 0 && (
+        <Section title={`${dayWord}, ${fmtDate(focus)}`} footer="Võid = selle tunni võid vahele jätta ja jääd piiri sisse. Paaristund võtab 2 tundi varu. Kolme punkti alt saad märkida, et tund jääb ära.">
+          {(() => {
+            // Show the timetable as planned, with cancelled lessons crossed out (they can be restored).
+            const planned = timetableOn(setup, focus);
+            const cancelledLeft = { ...(setup.cancelled?.[focus] ?? {}) };
+            const shown = planned.map((b) => {
+              const cut = b.selfStudy ? 0 : Math.min(cancelledLeft[b.subjectId] ?? 0, b.count);
+              if (cut) cancelledLeft[b.subjectId] -= cut;
+              return { b: cut && cut < b.count ? { ...b, count: b.count - cut } : b, cancelled: cut === b.count ? cut : 0 };
+            });
+            const times = shown.map((x) => lessonTimes(setup, x.b));
+            const currentIdx = live ? shown.findIndex((x, i) => !x.cancelled && times[i] && minutesOf(times[i]!.start) <= nowMin && nowMin < minutesOf(times[i]!.end)) : -1;
+            const nextIdx = live && currentIdx < 0 ? shown.findIndex((x, i) => !x.b.selfStudy && !x.cancelled && times[i] && minutesOf(times[i]!.start) > nowMin) : -1;
+            const missable = shown.filter((x) => !x.b.selfStudy && !x.cancelled);
+            return shown.map(({ b, cancelled }, i) => {
+              const t = times[i];
+              const past = !!live && !!t && minutesOf(t.end) <= nowMin;
+              if (b.selfStudy)
+                return (
+                  <Row key={i} detail={<span className="text-[15px]">iseõpe</span>}>
+                    <div className="flex items-center gap-3 text-muted">
+                      <SlotLabel slot={b.slot} time={t?.start} past />
+                      <span>{name(b.subjectId)}</span>
+                    </div>
+                  </Row>
+                );
+              if (cancelled)
+                return (
+                  <div key={i} className="cell flex items-center gap-3 px-5 min-h-[60px]">
+                    <SlotLabel slot={b.slot} time={t?.start} past />
+                    <div className="flex-1 min-w-0 py-2">
+                      <div className="truncate text-muted line-through decoration-1">{name(b.subjectId)}</div>
+                      <div className="text-[13px] text-muted">Jääb ära · ei loe puudumiseks</div>
+                    </div>
+                    <Button
+                      variant="quiet"
+                      className="shrink-0 min-h-9 px-3 text-[15px]"
+                      onClick={() => onCancel(focus, { [b.subjectId]: -cancelled }, `${name(b.subjectId)} toimub siiski.`)}
+                    >
+                      Taasta
+                    </Button>
+                  </div>
+                );
+              const r = row(b.subjectId);
+              const done = !!focusEntry?.lessons[b.subjectId];
+              const after = r ? r.left - b.count : 0;
+              const ok = !r || after >= 0;
+              const nextIsMh = !!r && r.left >= 0 && after < 0;
+              const highlight = i === currentIdx || i === nextIdx;
               return (
-                <Row key={i} detail={<span className="text-[15px]">iseõpe</span>}>
-                  <div className="flex items-center gap-3 text-muted">
-                    <SlotLabel slot={b.slot} time={lessonTimes(setup, b)?.start} past />
-                    <span>{name(b.subjectId)}</span>
+                <div key={i} className="cell">
+                  <div className={`flex items-center gap-2 pl-5 pr-3 min-h-[60px] ${highlight ? "bg-accent-soft/60" : ""}`}>
+                    <SlotLabel
+                      slot={b.slot}
+                      time={t?.start}
+                      past={past}
+                      tag={i === currentIdx ? "praegu" : i === nextIdx ? countdown(minutesOf(t!.start) - nowMin) : undefined}
+                    />
+                    <div className="flex-1 min-w-0 py-2 pl-1">
+                      <div className="truncate">{name(b.subjectId)}</div>
+                      <div className={`text-[13px] num truncate ${done ? "text-muted" : ok ? "text-ok" : "text-bad"}`}>
+                        {done ? "Kirjas" : !r ? "Ei lähe arvesse" : ok ? (after === 0 ? "Võid · siis piiril" : `Võid · jääb ${after}`) : nextIsMh ? `Ei · see tund = ${mh}` : "Ei · juba üle piiri"}
+                      </div>
+                    </div>
+                    {done ? (
+                      <span className="text-ok shrink-0 fade-in px-2">
+                        <Icon name="check" size={20} stroke={2.4} />
+                      </span>
+                    ) : (
+                      <>
+                        <Button
+                          variant={ok ? "ghost" : "quiet"}
+                          className={`shrink-0 min-h-9 px-3.5 text-[15px] ${ok ? "" : "text-bad"}`}
+                          onClick={() => onLogLesson(focus, b.subjectId, b.count)}
+                          aria-label={`Puudun: ${name(b.subjectId)} ${b.slot}`}
+                        >
+                          Puudun
+                        </Button>
+                        <button
+                          type="button"
+                          aria-label={`Muud valikud: ${name(b.subjectId)}`}
+                          aria-expanded={menu === i}
+                          onClick={() => setMenu(menu === i ? null : i)}
+                          className="shrink-0 size-9 grid place-items-center rounded-full text-muted cursor-pointer active:bg-surface-2"
+                        >
+                          <Icon name="more" size={22} stroke={3} />
+                        </button>
+                      </>
+                    )}
                   </div>
-                </Row>
-              );
-            const r = row(b.subjectId);
-            const done = !!focusEntry?.lessons[b.subjectId];
-            const after = r ? r.left - b.count : 0;
-            const ok = !r || after >= 0;
-            const nextIsMh = !!r && r.left >= 0 && after < 0;
-            return (
-              <div key={i} className={`cell flex items-center gap-3 px-5 min-h-[60px] ${live && (live.current === i || (live.current === null && live.next === i)) ? "bg-accent-soft/60" : ""}`}>
-                <SlotLabel
-                  slot={b.slot}
-                  time={lessonTimes(setup, b)?.start}
-                  past={!!live && !!lessonTimes(setup, b) && minutesOf(lessonTimes(setup, b)!.end) <= nowMin}
-                  tag={
-                    live?.current === i
-                      ? "praegu"
-                      : live?.next === i && live.current === null
-                        ? countdown(minutesOf(lessonTimes(setup, b)!.start) - nowMin)
-                        : undefined
-                  }
-                />
-                <div className="flex-1 min-w-0 py-2">
-                  <div className="truncate">{name(b.subjectId)}</div>
-                  <div className={`text-[13px] num ${done ? "text-muted" : ok ? "text-ok" : "text-bad"}`}>
-                    {done ? "Kirjas" : !r ? "Ei lähe arvesse" : ok ? (after === 0 ? "Võid · siis piiril" : `Võid · jääb ${tunde(after)}`) : nextIsMh ? `Ei · see tund = ${mh}` : "Ei · juba üle piiri"}
-                  </div>
+                  {menu === i && !done && (
+                    <div className="flex flex-wrap gap-2 px-5 pb-3 pt-1 fade-in">
+                      <Button
+                        variant="ghost"
+                        className="min-h-9 text-[15px]"
+                        onClick={() => {
+                          setMenu(null);
+                          onCancel(focus, { [b.subjectId]: b.count }, `${name(b.subjectId)} jääb ära.`);
+                        }}
+                      >
+                        Tund jääb ära
+                      </Button>
+                      <Button
+                        variant="quiet"
+                        className="min-h-9 text-[15px]"
+                        onClick={() => {
+                          setMenu(null);
+                          const all: Record<string, number> = {};
+                          for (const x of missable) all[x.b.subjectId] = (all[x.b.subjectId] ?? 0) + x.b.count;
+                          onCancel(focus, all, `${dayWord} jääb ära.`);
+                        }}
+                      >
+                        Terve päev jääb ära
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                {done ? (
-                  <span className="text-ok shrink-0 fade-in">
-                    <Icon name="check" size={20} stroke={2.4} />
-                  </span>
-                ) : (
-                  <Button
-                    variant={ok ? "ghost" : "quiet"}
-                    className={`shrink-0 min-h-9 px-4 text-[15px] ${ok ? "" : "text-bad"}`}
-                    onClick={() => onLogLesson(focus, b.subjectId, b.count)}
-                    aria-label={`Puudun: ${name(b.subjectId)} ${b.slot}`}
-                  >
-                    Puudun
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
           {open.length > 0 && (
             <Row onClick={() => onSkipDay(focus)}>
               <span className={v && v.blockers.length ? "text-bad" : "text-accent"}>{partial ? "Puudun ülejäänud tundidest" : "Puudun terve päeva"}</span>

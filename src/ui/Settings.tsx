@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { segmentFor, totals } from "../core/calc";
+import { segmentFor, totals, withCancelled } from "../core/calc";
 import { today } from "../core/dates";
 import { isValidISO } from "../core/dates";
 import { SCHOOLS } from "../core/schools";
@@ -68,8 +68,8 @@ export function Settings({ store }: { store: Store }) {
           <Row onClick={() => open("timetable")} chevron detail={<span className="num">{setup.segments.length}</span>}>
             Tunniplaan
           </Row>
-          <Row onClick={() => open("holidays")} chevron detail={<span className="num">{setup.holidays.length}</span>}>
-            Vabad päevad
+          <Row onClick={() => open("holidays")} chevron detail={<span className="num">{setup.holidays.length + Object.keys(setup.cancelled ?? {}).length}</span>}>
+            Vabad päevad ja ärajäänud tunnid
           </Row>
         </Section>
         <Section title="Andmed" footer="Kõik on ainult selles seadmes. Klassikaaslastega jagad ainult tunniplaani ja reeglit, mitte puudumisi.">
@@ -497,6 +497,34 @@ function HolidaysPage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }
           </Button>
         </div>
       </Section>
+      {Object.keys(setup.cancelled ?? {}).length > 0 && (
+        <Section title="Ärajäänud tunnid" footer="Need tunnid ei toimunud või ei toimu. Need vähendavad aine tundide koguarvu, aga ei ole puudumised.">
+          {Object.entries(setup.cancelled!)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([date, subs]) => (
+              <Row
+                key={date}
+                detail={
+                  <button
+                    type="button"
+                    aria-label={`Taasta ${fmtDate(date)}`}
+                    className="size-9 -mr-2 grid place-items-center rounded-full text-muted cursor-pointer active:bg-surface-2"
+                    onClick={() => updateSetup((s) => void (s.cancelled = withCancelled(s.cancelled, date, Object.fromEntries(Object.entries(subs).map(([id, n]) => [id, -n])))))}
+                  >
+                    <Icon name="x" size={18} />
+                  </button>
+                }
+              >
+                <span className="num">{fmtDate(date, true)}</span>
+                <div className="text-[13px] text-muted truncate">
+                  {Object.entries(subs)
+                    .map(([id, n]) => `${setup.subjects.find((x) => x.id === id)?.name ?? id}${n > 1 ? ` ×${n}` : ""}`)
+                    .join(", ")}
+                </div>
+              </Row>
+            ))}
+        </Section>
+      )}
     </>
   );
 }
@@ -548,7 +576,7 @@ function SharePage({ data, replaceAll, setMsg }: { data: AppData; replaceAll: St
             onClick={() => {
               const s = decodeSetup(code.trim().replace(/^.*#setup=/, ""));
               if (!s) return setMsg("See kood ei tööta.");
-              replaceAll({ ...data, setup: s });
+              replaceAll({ ...data, setup: { ...s, cancelled: s.cancelled ?? data.setup?.cancelled } });
               setCode("");
               setMsg("Seadistus laaditud. Sinu puudumised jäid alles.");
             }}

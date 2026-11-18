@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayCapacity, dayClock, lessonTimes, dayVerdict, maxAllowed, nextLesson, nextSchoolDay, planningSegment, preview, statusOf, summary, totals } from "./calc";
+import { dayCapacity, dayClock, lessonTimes, lessonsOn, timetableOn, withCancelled, dayVerdict, maxAllowed, nextLesson, nextSchoolDay, planningSegment, preview, statusOf, summary, totals } from "./calc";
 import { parsePaste, toAbsences } from "./importer";
 import { decodeSetup, encodeSetup } from "./share";
 import { appendLesson, breakDays, buildSetup, cycleLesson, defaultWindow, removeLesson, startingAbsence } from "./setup";
@@ -280,5 +280,23 @@ describe("lesson times", () => {
     expect(at(10, 35)).toEqual({ current: null, next: 1, over: false }); // break before Füüsika
     expect(at(15, 30)).toMatchObject({ current: null, next: null, over: true });
     expect(dayClock({ ...setup, periodTimes: undefined }, "2026-11-18", 600)).toBeNull();
+  });
+});
+
+describe("cancelled lessons", () => {
+  const base = ram9bTemplate();
+  it("lower the total and can lower what is allowed, without counting as absences", () => {
+    const before = summary(base, [], "2026-11-18").find((r) => r.subject.id === "fuusika")!;
+    // Two double Füüsika lessons cancelled: 34 -> 30 lessons, max 8 -> 7.
+    const cancelled = withCancelled(withCancelled(undefined, "2026-11-25", { fuusika: 2 }), "2026-12-02", { fuusika: 2 });
+    const after = summary({ ...base, cancelled }, [], "2026-11-18").find((r) => r.subject.id === "fuusika")!;
+    expect([before.total, before.max]).toEqual([34, 8]);
+    expect([after.total, after.max, after.absent]).toEqual([30, 7, 0]);
+  });
+  it("removes just the cancelled part of a day, and can be undone", () => {
+    const s = { ...base, cancelled: withCancelled(undefined, "2026-11-25", { fuusika: 2 }) };
+    expect(timetableOn(s, "2026-11-25").map((l) => l.subjectId)).toContain("fuusika");
+    expect(lessonsOn(s, "2026-11-25").map((l) => l.subjectId)).not.toContain("fuusika");
+    expect(withCancelled(s.cancelled, "2026-11-25", { fuusika: -2 })).toEqual({});
   });
 });

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { inWindow, lessonTimes, lessonsOn, missableOn, preview, segmentFor, statusOf } from "../core/calc";
+import { inWindow, lessonTimes, lessonsOn, missableOn, preview, segmentFor, statusOf, summary, withCancelled } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow } from "../core/types";
 import { newId } from "../store";
@@ -13,16 +13,23 @@ const MAX_RANGE_DAYS = 31;
 export function LogAbsence({
   setup,
   rows,
+  absences,
   now,
   onSave,
   onSaveMany,
+  onCancel,
 }: {
   setup: Setup;
   rows: SubjectRow[];
+  absences: Absence[];
   now: string;
   onSave: (a: Absence) => void;
   onSaveMany: (a: Absence[]) => void;
+  onCancel: (date: string, changes: Record<string, number>, label: string) => void;
 }) {
+  /** "absent": I miss lessons. "cancel": lessons do not take place (lowers the totals). */
+  const [mode, setMode] = useState<"absent" | "cancel">("absent");
+  const [cancelPick, setCancelPick] = useState<Set<number>>(new Set());
   const tomorrow = addDays(now, 1);
   const [date, setDate] = useState(now);
   const [pick, setPick] = useState<DayPick>("today");
@@ -43,6 +50,7 @@ export function LogAbsence({
     if (!d) return;
     setDate(d);
     setUnchecked(new Set());
+    setCancelPick(new Set());
     setExtra({});
   };
 
@@ -73,6 +81,22 @@ export function LogAbsence({
     return s;
   }, [rangeDays]);
 
+  // Cancelled lessons: what they do to each subject's total and allowance.
+  const cancelSel = useMemo(() => {
+    const c: Record<string, number> = {};
+    blocks.forEach((b, i) => {
+      if (!b.selfStudy && cancelPick.has(i)) c[b.subjectId] = (c[b.subjectId] ?? 0) + b.count;
+    });
+    return c;
+  }, [blocks, cancelPick]);
+  const cancelEffect = useMemo(() => {
+    if (mode !== "cancel" || !Object.keys(cancelSel).length) return [];
+    const after = new Map(summary({ ...setup, cancelled: withCancelled(setup.cancelled, date, cancelSel) }, absences, now).map((r) => [r.subject.id, r]));
+    return rows.filter((r) => cancelSel[r.subject.id]).map((r) => ({ before: r, after: after.get(r.subject.id)! }));
+  }, [mode, cancelSel, setup, date, absences, now, rows]);
+  const cancelTotal = Object.values(cancelSel).reduce((x, y) => x + y, 0);
+  const fewerAllowed = cancelEffect.filter((e) => e.after && e.after.max < e.before.max);
+
   const p = preview(setup, rows, date, multi ? rangeSel : sel);
   const noTimetable = inWindow(setup, date) && wd >= 1 && wd <= 5 && !setup.holidays.includes(date) && !seg;
 
@@ -87,6 +111,13 @@ export function LogAbsence({
   if (future && inWindow(setup, date) && canLog) info = `${info} Läheb plaanina kirja ja hakkab lugema, kui päev käes.`.trim();
 
   const save = () => {
+    if (mode === "cancel") {
+      if (!cancelTotal) return;
+      const names = Object.keys(cancelSel).map(name);
+      onCancel(date, cancelSel, `${joinEt(names)} jääb ära, ${fmtDate(date)}.`);
+      setCancelPick(new Set());
+      return;
+    }
     if (!p.total) return;
     if (multi) {
       const createdAt = new Date().toISOString();
@@ -114,9 +145,22 @@ export function LogAbsence({
           : `${tunde(p.total)}, jääd piiri sisse`;
   const action = future ? "Planeeri" : "Salvesta";
 
+  const cancelMode = mode === "cancel";
   return (
     <>
-      <Section footer={(!multi && info) || undefined}>
+      <Segmented<"absent" | "cancel">
+        label="Mida märgid"
+        value={mode}
+        onChange={(m) => {
+          setMode(m);
+          if (m === "cancel") setMulti(false);
+        }}
+        options={[
+          { value: "absent", label: "Puudun" },
+          { value: "cancel", label: "Tund jääb ära" },
+        ]}
+      />
+      <Section footer={(!multi && (cancelMode ? "Ärajäänud tund ei ole puudumine, aga vähendab aine tundide koguarvu. Nii võib lubatud puudumisi jääda vähemaks." : info)) || undefined}>
         <div className="p-3">
           <Segmented<DayPick>
             label="Päev"
@@ -160,10 +204,12 @@ export function LogAbsence({
             />
           </label>
         )}
-        <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>Mitu päeva</span>
-          <Switch label="Mitu päeva" checked={multi} onChange={setMulti} />
-        </div>
+        {!cancelMode && (
+          <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
+            <span>Mitu päeva</span>
+            <Switch label="Mitu päeva" checked={multi} onChange={setMulti} />
+          </div>
+        )}
       </Section>
 
       {multi && (
@@ -180,7 +226,56 @@ export function LogAbsence({
         </Section>
       )}
 
-      {!multi && (blocks.length > 0 || noTimetable || extraOpen || Object.keys(extra).length > 0) && (
+      {cancelMode && (
+        <Section title={`Mis tunnid jäävad ära, ${fmtDate(date)}`} footer={blocks.some((b) => !b.selfStudy) ? undefined : "Sel päeval pole tunde, mis saaks ära jääda."}>
+          {blocks
+            .map((b, i) => ({ b, i }))
+            .filter(({ b }) => !b.selfStudy)
+            .map(({ b, i }) => (
+              <button
+                key={i}
+                type="button"
+                role="checkbox"
+                aria-checked={cancelPick.has(i)}
+                onClick={() => {
+                  const n = new Set(cancelPick);
+                  n.has(i) ? n.delete(i) : n.add(i);
+                  setCancelPick(n);
+                }}
+                className="cell press flex items-center gap-3 px-5 min-h-[52px] w-full text-left cursor-pointer"
+              >
+                <span className="num text-[15px] text-muted w-12 shrink-0">{lessonTimes(setup, b)?.start ?? `${b.slot}.`}</span>
+                <span className="flex-1 min-w-0 truncate">{name(b.subjectId)}</span>
+                <span className="num text-[15px] text-muted">{tunde(b.count)}</span>
+                <Check on={cancelPick.has(i)} />
+              </button>
+            ))}
+        </Section>
+      )}
+
+      {cancelMode && cancelEffect.length > 0 && (
+        <Section title="Mis muutub" footer="Lubatud puudumised arvutatakse uuest, väiksemast tundide arvust.">
+          {cancelEffect.map(({ before, after }) => (
+            <Row
+              key={before.subject.id}
+              detail={
+                after.max < before.max ? (
+                  <span className="text-warn font-semibold text-[15px] num">lubatud {before.max} → {after.max}</span>
+                ) : (
+                  <span className="text-[15px] num">lubatud {after.max}</span>
+                )
+              }
+            >
+              <div className="truncate">{before.subject.name}</div>
+              <div className="text-[13px] text-muted num">
+                tunde kokku {before.total} → {after.total}
+              </div>
+            </Row>
+          ))}
+        </Section>
+      )}
+
+      {!cancelMode && !multi && (blocks.length > 0 || noTimetable || extraOpen || Object.keys(extra).length > 0) && (
         <Section title={`Tunnid, ${fmtDate(date)}`}>
           {blocks.map((b, i) =>
             b.selfStudy ? (
@@ -258,7 +353,7 @@ export function LogAbsence({
         </Section>
       )}
 
-      {p.lines.length > 0 && (
+      {!cancelMode && p.lines.length > 0 && (
         <Section title="Mis alles jääb" footer={`Puudutud / kõik perioodi tunnid${future ? ", koos plaanidega" : ""}.`}>
           <div aria-live="polite">
             {p.lines.map((l) => (
@@ -277,19 +372,38 @@ export function LogAbsence({
         </Section>
       )}
 
+      {!cancelMode && (
       <Section>
         <label className="cell flex items-center px-5">
           <input className="cell-input text-[17px] placeholder:text-faint" maxLength={120} placeholder="Märkus (nt arsti juures)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Märkus" />
         </label>
       </Section>
+      )}
 
       <div className="glass sticky z-10 bottom-[calc(env(safe-area-inset-bottom)+82px)] rounded-full pl-5 pr-1.5 py-1.5 flex items-center gap-3">
-        <div role="status" className={`flex-1 min-w-0 text-[15px] leading-tight font-medium ${!p.total || !p.counts ? "text-muted" : goesOver ? "text-bad" : "text-ok"}`}>
-          {verdict}
-        </div>
-        <Button variant={goesOver ? "danger" : "primary"} onClick={save} disabled={!p.total} className="shrink-0">
-          {goesOver ? `${action} ikkagi` : action}
-        </Button>
+        {cancelMode ? (
+          <>
+            <div role="status" className={`flex-1 min-w-0 text-[15px] leading-tight font-medium ${!cancelTotal ? "text-muted" : fewerAllowed.length ? "text-warn" : "text-ink"}`}>
+              {!cancelTotal
+                ? "Vali tunnid, mis jäävad ära"
+                : fewerAllowed.length
+                  ? `${tunde(cancelTotal)} jääb ära. ${joinEt(fewerAllowed.map((e) => e.before.subject.name))}: lubatud vähem`
+                  : `${tunde(cancelTotal)} jääb ära`}
+            </div>
+            <Button onClick={save} disabled={!cancelTotal} className="shrink-0">
+              Märgi
+            </Button>
+          </>
+        ) : (
+          <>
+            <div role="status" className={`flex-1 min-w-0 text-[15px] leading-tight font-medium ${!p.total || !p.counts ? "text-muted" : goesOver ? "text-bad" : "text-ok"}`}>
+              {verdict}
+            </div>
+            <Button variant={goesOver ? "danger" : "primary"} onClick={save} disabled={!p.total} className="shrink-0">
+              {goesOver ? `${action} ikkagi` : action}
+            </Button>
+          </>
+        )}
       </div>
     </>
   );

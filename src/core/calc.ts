@@ -38,14 +38,47 @@ export function segmentFor(setup: Setup, ds: ISODate): Segment | null {
   return setup.segments.find((s) => ds >= s.start && ds <= s.end) ?? null;
 }
 
-/** Lesson blocks on a date (empty on weekends, holidays, outside segments). */
-export function lessonsOn(setup: Setup, ds: ISODate): Lesson[] {
+/** Timetabled lesson blocks on a date, before cancellations (empty on weekends, holidays, outside segments). */
+export function timetableOn(setup: Setup, ds: ISODate): Lesson[] {
   const wd = weekdayOf(ds);
   if (!isSchoolWeekday(wd)) return [];
   if (setup.holidays.includes(ds)) return [];
   if (ds < setup.windowStart || ds > setup.windowEnd) return [];
   const seg = segmentFor(setup, ds);
   return seg ? seg.timetable[wd] ?? [] : [];
+}
+
+/** Lessons that actually take place on a date: the timetable minus cancelled lessons. */
+export function lessonsOn(setup: Setup, ds: ISODate): Lesson[] {
+  const blocks = timetableOn(setup, ds);
+  const c = setup.cancelled?.[ds];
+  if (!c) return blocks;
+  const left = { ...c };
+  const out: Lesson[] = [];
+  for (const l of blocks) {
+    const cut = l.selfStudy ? 0 : Math.min(left[l.subjectId] ?? 0, l.count);
+    if (cut) left[l.subjectId] -= cut;
+    if (l.count - cut > 0) out.push(cut ? { ...l, count: l.count - cut } : l);
+  }
+  return out;
+}
+
+/** Add (k > 0) or remove (k < 0) cancelled lessons; returns the new map, dropping empty days. */
+export function withCancelled(
+  cancelled: Setup["cancelled"],
+  ds: ISODate,
+  changes: Record<string, number>,
+): Record<ISODate, Record<string, number>> {
+  const out = structuredClone(cancelled ?? {});
+  const day = { ...(out[ds] ?? {}) };
+  for (const [id, k] of Object.entries(changes)) {
+    const n = (day[id] ?? 0) + k;
+    if (n > 0) day[id] = n;
+    else delete day[id];
+  }
+  if (Object.keys(day).length) out[ds] = day;
+  else delete out[ds];
+  return out;
 }
 
 function lessonCounts(setup: Setup, from: ISODate, to: ISODate): Record<string, number> {

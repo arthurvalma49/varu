@@ -55,6 +55,7 @@ const ICONS = {
   gauge: "M12 14l3-5M4.5 17a9 9 0 1 1 15 0",
   lock: "M7 11V8a5 5 0 0 1 10 0v3M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z",
   share: "M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
 } as const;
 export type IconName = keyof typeof ICONS;
 export function Icon({ name, size = 20, stroke = 2 }: { name: IconName; size?: number; stroke?: number }) {
