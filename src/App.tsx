@@ -10,7 +10,7 @@ import { Onboarding } from "./ui/Onboarding";
 import { Overview } from "./ui/Overview";
 import { Settings } from "./ui/Settings";
 import { ShareCard } from "./ui/ShareCard";
-import { Button, LargeTitle, cap, fmtDate, fmtLong, tunde } from "./ui/kit";
+import { Button, Icon, LargeTitle, cap, fmtDate, fmtLong, tunde } from "./ui/kit";
 
 type Tab = "overview" | "log" | "history" | "settings";
 const TITLES: Record<Tab, string> = { overview: "Täna", log: "Lisa puudumine", history: "Ajalugu", settings: "Seaded" };
@@ -34,6 +34,14 @@ export default function App() {
   const [incoming, setIncoming] = useState<Setup | null>(readHashSetup);
   const [toast, setToast] = useState<{ text: string; undo?: () => void; key: number } | null>(null);
   const now = today();
+  // iOS: the large title collapses into a compact bar once it scrolls away.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 48);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -130,6 +138,16 @@ export default function App() {
 
   return (
     <div className="min-h-dvh">
+      {tab !== "settings" && (
+        <div
+          aria-hidden={!scrolled}
+          className={`fixed inset-x-0 top-0 z-20 bg-bar backdrop-blur-xl shadow-[0_0.5px_0_var(--line)] pt-[env(safe-area-inset-top)] transition-opacity duration-200 motion-reduce:transition-none ${
+            scrolled ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <div className="h-11 grid place-items-center font-semibold text-[17px]">{TITLES[tab]}</div>
+        </div>
+      )}
       <main className="max-w-[640px] mx-auto px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-32 flex flex-col gap-7">
         {store.saveError && <SaveError />}
         {tab !== "settings" && <div className="-mx-4 -mb-3"><LargeTitle title={TITLES[tab]} subtitle={sub} /></div>}
@@ -181,8 +199,11 @@ export default function App() {
         <div
           key={toast.key}
           role="status"
-          className="toast-in fixed z-20 inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+82px)] max-w-[420px] mx-auto rounded-full bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-5 pr-1.5 py-1.5 flex items-center gap-3 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
+          className="toast-in fixed z-20 inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+82px)] max-w-[420px] mx-auto rounded-full bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-2.5 pr-1.5 py-1.5 flex items-center gap-2.5 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
         >
+          <span className="shrink-0 size-6 rounded-full bg-[#30d158] text-black grid place-items-center">
+            <Icon name="check" size={14} stroke={3} />
+          </span>
           <span className="flex-1 min-w-0 text-[15px] num truncate">{toast.text}</span>
           {toast.undo && (
             <button
@@ -200,7 +221,12 @@ export default function App() {
       )}
 
       <nav className="fixed z-10 inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+10px)] px-5 pointer-events-none" aria-label="Põhimenüü">
-        <div className="glass pointer-events-auto max-w-[420px] mx-auto rounded-full p-1 grid grid-cols-4">
+        <div className="glass pointer-events-auto max-w-[420px] mx-auto rounded-full p-1 grid grid-cols-4 relative">
+          <span
+            aria-hidden
+            className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/4)] rounded-full bg-surface-2 transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none"
+            style={{ transform: `translateX(${TABS.findIndex((t) => t.id === tab) * 100}%)` }}
+          />
           {TABS.map((t) => {
             const on = tab === t.id;
             return (
@@ -209,8 +235,8 @@ export default function App() {
                 type="button"
                 aria-current={on ? "page" : undefined}
                 onClick={() => go(t.id)}
-                className={`flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full cursor-pointer transition-colors duration-200 ${
-                  on ? "bg-surface-2 text-accent" : "text-ink"
+                className={`relative flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full cursor-pointer transition-colors duration-200 ${
+                  on ? "text-accent" : "text-ink"
                 }`}
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { fractionToPct } from "../core/calc";
 import type { Fraction, Rule, Status } from "../core/types";
 
@@ -267,9 +267,15 @@ const BAR: Record<Status, string> = { ok: "bg-ok-fill", warn: "bg-warn-fill", ed
  * "over" still has room; planned lessons show as a faded extension after the missed ones.
  */
 export function Meter({ pct: p, planPct = 0, limitPct, status, label }: { pct: number; planPct?: number; limitPct: number; status: Status; label: string }) {
+  // Grow in from zero on first paint; the .anim transition only runs under no-preference motion.
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(t);
+  }, []);
   const scale = limitPct * 1.6;
-  const w = Math.min(p / scale, 1) * 100;
-  const wp = Math.min((p + planPct) / scale, 1) * 100 - w;
+  const w = shown ? Math.min(p / scale, 1) * 100 : 0;
+  const wp = shown ? Math.min((p + planPct) / scale, 1) * 100 - w : 0;
   return (
     <div className="relative h-1 rounded-full bg-surface-2 mt-1.5" role="img" aria-label={label}>
       <i className={`anim absolute inset-y-0 left-0 rounded-full ${BAR[status]}`} style={{ width: `${w}%` }} />

@@ -73,7 +73,7 @@ export function Overview({
     { id: "calm", title: "Rahulik", rows: graded.filter((r) => r.status === "ok") },
     { id: "soft", title: "Vähem tähtis", rows: rows.filter((r) => r.subject.advisory) },
   ].filter((g) => g.rows.length);
-  const calmCollapsible = graded.some((r) => r.left <= 2) && graded.filter((r) => r.status === "ok").length > 4;
+  const calmCollapsible = graded.filter((r) => r.status === "ok").length > 5;
 
   const schoolDaysLeft =
     now > setup.windowEnd
@@ -87,6 +87,14 @@ export function Overview({
     <div className="flex flex-col gap-7">
       {/* Verdict */}
       <Card className="gap-2">
+        {focus && (
+          <span
+            aria-hidden
+            className={`size-9 rounded-full grid place-items-center mb-1 ${!v ? "bg-surface-2 text-muted" : v.blockers.length ? "bg-bad-soft text-bad" : "bg-ok-soft text-ok"}`}
+          >
+            <Icon name={v && v.blockers.length ? "alert" : "check"} size={20} stroke={2.4} />
+          </span>
+        )}
         {!focus ? (
           <h2 className="m-0 text-[28px] leading-[34px] font-bold">Selle perioodi koolipäevad on läbi.</h2>
         ) : v ? (
@@ -154,7 +162,7 @@ export function Overview({
                   </div>
                 </div>
                 {done ? (
-                  <span className="text-muted shrink-0">
+                  <span className="text-ok shrink-0 fade-in">
                     <Icon name="check" size={20} stroke={2.4} />
                   </span>
                 ) : (
@@ -186,7 +194,11 @@ export function Overview({
             const selfStudy = seg?.timetable[d]?.some((b) => b.selfStudy);
             const tone = c === null ? "border border-dashed border-line text-muted" : c === 0 ? "bg-bad-soft text-bad" : c === 1 ? "bg-warn-soft text-warn" : "bg-surface-2";
             return (
-              <div key={d} className={`rounded-[16px] py-2.5 text-center flex flex-col gap-0.5 ${tone}`}>
+              <div
+                key={d}
+                className={`rounded-[16px] py-2.5 text-center flex flex-col gap-0.5 ${tone} ${weekdayOf(now) === d ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""}`}
+                aria-label={weekdayOf(now) === d ? "täna" : undefined}
+              >
                 <b className={`num leading-none ${c === null ? "text-[13px] leading-[26px] font-medium" : "text-[26px] font-semibold"}`}>
                   {c === null ? (selfStudy ? "iseõpe" : "vaba") : c}
                 </b>
@@ -200,7 +212,7 @@ export function Overview({
       {/* Subjects */}
       {groups.map((g) => {
         const collapsed = g.id === "calm" && calmCollapsible && !showCalm;
-        const list = collapsed ? g.rows.slice(0, 3) : g.rows;
+        const list = collapsed ? g.rows.slice(0, 4) : g.rows;
         return (
           <Section key={g.id} title={g.id === "edge" ? <span className="text-bad">{g.title}</span> : g.title}>
             {list.map((r) => (
