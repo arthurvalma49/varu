@@ -53,20 +53,71 @@ export function edupageSchool(input: string): string | null {
 
 const lessonsOfClass = (d: EduData, classId: string) => d.lessons.filter((l) => l.classids.includes(classId));
 
-/** Group splits the student must choose from (e.g. Inglise 1 / Inglise 2, Boys / Girls). */
-export function eduDivisions(d: EduData, classId: string): { id: string; groups: { id: string; name: string }[] }[] {
-  const used = new Set(lessonsOfClass(d, classId).flatMap((l) => l.groupids));
+export interface EduGroupOption {
+  id: string;
+  name: string;
+  /** What the group actually has, e.g. [{ subject: "Inglise keel", days: "E, K, R" }]. */
+  lessons: { subject: string; days: string }[];
+}
+
+const WD = ["E", "T", "K", "N", "R"];
+
+/**
+ * Group splits the student must choose from, each group described by its own lessons so that
+ * "Grupp 1 / Grupp 2" becomes "Inglise keel · E, K, R". Splits where every group has the very
+ * same lessons (same subject, day and period) are left out: the choice changes nothing.
+ */
+export function eduDivisions(d: EduData, classId: string): { id: string; title: string; groups: EduGroupOption[] }[] {
+  const classLessons = lessonsOfClass(d, classId);
+  const used = new Set(classLessons.flatMap((l) => l.groupids));
   const groups = new Map(d.groups.map((g) => [g.id, g]));
+  const subjectName = new Map(d.subjects.map((s) => [s.id, s.name.replace(SELF_STUDY, "").trim()]));
+  const cardsByLesson = new Map<string, EduData["cards"]>();
+  for (const c of d.cards) cardsByLesson.set(c.lessonid, [...(cardsByLesson.get(c.lessonid) ?? []), c]);
+
+  const describe = (groupId: string) => {
+    const lessons = classLessons.filter((l) => l.groupids.includes(groupId));
+    const bySubject = new Map<string, Set<number>>();
+    const signature: string[] = [];
+    for (const l of lessons) {
+      const name = subjectName.get(l.subjectid) ?? "";
+      for (const c of cardsByLesson.get(l.id) ?? []) {
+        [...c.days].forEach((bit, i) => {
+          if (bit !== "1" || i >= 5) return;
+          bySubject.set(name, new Set([...(bySubject.get(name) ?? []), i]));
+          signature.push(`${name}|${i}|${c.period}`);
+        });
+      }
+    }
+    return {
+      lessons: [...bySubject].map(([subject, days]) => ({ subject, days: [...days].sort().map((i) => WD[i]).join(", ") })),
+      signature: signature.sort().join(";"),
+    };
+  };
+
   return d.divisions
     .filter((v) => v.classid === classId)
-    .map((v) => ({
-      id: v.id,
-      groups: v.groupids
+    .map((v) => {
+      const opts = v.groupids
         .map((id) => groups.get(id))
         .filter((g): g is EduData["groups"][number] => !!g && !g.entireclass && used.has(g.id))
-        .map((g) => ({ id: g.id, name: g.name })),
-    }))
-    .filter((v) => v.groups.length >= 2);
+        .map((g) => ({ id: g.id, name: g.name, ...describe(g.id) }));
+      return { id: v.id, opts };
+    })
+    .filter((v) => v.opts.length >= 2 && new Set(v.opts.map((o) => o.signature)).size > 1)
+    .map((v) => {
+      const subjects = [...new Set(v.opts.flatMap((o) => o.lessons.map((l) => l.subject)))];
+      return {
+        id: v.id,
+        title:
+          subjects.length === 1
+            ? `${subjects[0]}: mis rühmas oled?`
+            : subjects.every((x) => / keel$/i.test(x))
+              ? "Mis keelt õpid?"
+              : `Mis rühmas oled? (${subjects.slice(0, 3).join(", ")}${subjects.length > 3 ? "…" : ""})`,
+        groups: v.opts.map(({ signature: _s, ...o }) => o),
+      };
+    });
 }
 
 export interface EduResult {
@@ -78,19 +129,26 @@ export interface EduResult {
 
 /**
  * Build one student's week. `picks` maps division id -> chosen group id; a division without a
- * pick includes none of its group lessons (the UI always picks one).
+ * pick uses its first group.
  */
 export function eduTimetable(d: EduData, classId: string, picks: Record<string, string>): EduResult {
   const groupById = new Map(d.groups.map((g) => [g.id, g]));
   const divisionOf = new Map<string, string>();
-  for (const v of d.divisions) for (const g of v.groupids) divisionOf.set(g, v.id);
+  // A split nobody was asked about (all groups identical) counts its first real group, once.
+  const firstOf = new Map<string, string>();
+  for (const v of d.divisions)
+    for (const g of v.groupids) {
+      divisionOf.set(g, v.id);
+      if (!firstOf.has(v.id) && groupById.get(g) && !groupById.get(g)!.entireclass) firstOf.set(v.id, g);
+    }
+  const picked = (div: string) => picks[div] ?? firstOf.get(div);
   const periodNo = new Map(d.periods.map((p, i) => [p.id, Number.parseInt(p.period, 10) || i + 1]));
   const subjectName = new Map(d.subjects.map((s) => [s.id, s.name.trim()]));
 
   const attends = (l: EduData["lessons"][number]) => {
     const mine = l.groupids.map((id) => groupById.get(id)).filter((g) => g && g.classid === classId);
     if (!mine.length) return true; // joined lesson listed under another class's groups
-    return mine.some((g) => g!.entireclass || picks[divisionOf.get(g!.id) ?? ""] === g!.id);
+    return mine.some((g) => g!.entireclass || picked(divisionOf.get(g!.id) ?? "") === g!.id);
   };
 
   const lessons = new Map(lessonsOfClass(d, classId).filter(attends).map((l) => [l.id, l]));

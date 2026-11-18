@@ -35,8 +35,12 @@ Done and working:
 - EduPage often refuses connections from Vercel's cloud servers (timeouts from both arn1 and fra1, while home connections work), so the live proxy is best-effort. RAM therefore ships a static snapshot in `public/edupage/ramkool/`, which the import reads first. **When RAM publishes a new period (e.g. III periood in January), run `node scripts/edupage-snapshot.mjs ramkool` from a home machine, commit and push.** Other schools use the live proxy.
 - Lesson times: setups can carry `periodTimes` (bell times by lesson number; from EduPage, RAM built in). Täna then shows times, marks the current or next lesson live, and rolls over to tomorrow after the last lesson ends. Without times it falls back to 15:00.
 - Lisa "Mitu päeva": plan a date range in one go (one entry per school day, one undo).
-- Cancelled lessons ("jääb ära"): `setup.cancelled` by date and subject. `lessonsOn` subtracts them, so totals (and possibly the allowed absences) drop; they are not absences. Marked from Täna (three-dot menu per lesson, or the whole day), from Lisa ("Tund jääb ära" mode with a before/after preview), listed in Seaded → Vabad päevad. They travel with share links and survive a setup replacement.
-- 30 vitest tests. `npm test` and `npm run build` pass.
+- Cancelled lessons ("jääb ära"): `setup.cancelled` by date and subject. `lessonsOn` subtracts them, so totals (and possibly the allowed absences) drop; they are not absences. Marked from Täna (three-dot menu per lesson, or the whole day), from Lisa ("Tund jääb ära" mode with a before/after preview), listed in Seaded → Vabad päevad. They are personal: never included in share links or codes, and kept when a share link replaces the setup.
+- Double lessons can be skipped one hour at a time (Täna asks which half; Lisa has an hour chip).
+- EduPage groups: only splits whose groups meet at different times or for different subjects are asked; each option shows its lessons ("Hispaania keel · T, N"). RAM 9.b: one question instead of five.
+- Testrežiim (Seaded → Testimine): demo data from `src/core/demo.ts`; the real data is parked in localStorage `varu:real` and restored on exit.
+- Onboarding has a "Kus mis on" page explaining the four tabs.
+- 33 vitest tests. `npm test` and `npm run build` pass.
 
 Known gaps:
 - The paste importer has never been tested on a real Stuudium/eKool copy.

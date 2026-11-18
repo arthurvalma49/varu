@@ -34,6 +34,8 @@ export function LogAbsence({
   const [date, setDate] = useState(now);
   const [pick, setPick] = useState<DayPick>("today");
   const [unchecked, setUnchecked] = useState<Set<number>>(new Set());
+  /** Double lessons where only part is missed: block index -> lessons missed. */
+  const [partial, setPartial] = useState<Record<number, number>>({});
   const [extra, setExtra] = useState<Record<string, number>>({});
   const [extraOpen, setExtraOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -51,17 +53,18 @@ export function LogAbsence({
     setDate(d);
     setUnchecked(new Set());
     setCancelPick(new Set());
+    setPartial({});
     setExtra({});
   };
 
   const sel = useMemo(() => {
     const s: Record<string, number> = {};
     blocks.forEach((b, i) => {
-      if (!b.selfStudy && !unchecked.has(i)) s[b.subjectId] = (s[b.subjectId] ?? 0) + b.count;
+      if (!b.selfStudy && !unchecked.has(i)) s[b.subjectId] = (s[b.subjectId] ?? 0) + (partial[i] ?? b.count);
     });
     for (const [id, n] of Object.entries(extra)) if (n > 0) s[id] = (s[id] ?? 0) + n;
     return s;
-  }, [blocks, unchecked, extra]);
+  }, [blocks, unchecked, extra, partial]);
 
   // Several days: every missable lesson of each school day in the range, one entry per day.
   const rangeDays = useMemo(() => {
@@ -286,23 +289,35 @@ export function LogAbsence({
                 </div>
               </Row>
             ) : (
-              <button
-                key={i}
-                type="button"
-                role="checkbox"
-                aria-checked={!unchecked.has(i)}
-                onClick={() => {
-                  const n = new Set(unchecked);
-                  n.has(i) ? n.delete(i) : n.add(i);
-                  setUnchecked(n);
-                }}
-                className="cell press flex items-center gap-3 px-5 min-h-[52px] w-full text-left cursor-pointer"
-              >
-                <span className="num text-[15px] text-muted w-12 shrink-0">{lessonTimes(setup, b)?.start ?? `${b.slot}.`}</span>
-                <span className="flex-1 min-w-0 truncate">{name(b.subjectId)}</span>
-                <span className="num text-[15px] text-muted">{tunde(b.count)}</span>
-                <Check on={!unchecked.has(i)} />
-              </button>
+              <div key={i} className="cell flex items-center pr-3">
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={!unchecked.has(i)}
+                  onClick={() => {
+                    const n = new Set(unchecked);
+                    n.has(i) ? n.delete(i) : n.add(i);
+                    setUnchecked(n);
+                  }}
+                  className="press flex-1 min-w-0 flex items-center gap-3 pl-5 pr-2 min-h-[52px] text-left cursor-pointer"
+                >
+                  <span className="num text-[15px] text-muted w-12 shrink-0">{lessonTimes(setup, b)?.start ?? `${b.slot}.`}</span>
+                  <span className="flex-1 min-w-0 truncate">{name(b.subjectId)}</span>
+                  <Check on={!unchecked.has(i)} />
+                </button>
+                {b.count > 1 && !unchecked.has(i) ? (
+                  <button
+                    type="button"
+                    onClick={() => setPartial({ ...partial, [i]: (partial[i] ?? b.count) > 1 ? (partial[i] ?? b.count) - 1 : b.count })}
+                    aria-label={`${name(b.subjectId)}: puudud ${tunde(partial[i] ?? b.count)}, muuda`}
+                    className="shrink-0 num min-h-8 px-3 rounded-full bg-accent-soft text-accent text-[13px] font-semibold cursor-pointer"
+                  >
+                    {tunde(partial[i] ?? b.count)}
+                  </button>
+                ) : (
+                  <span className="shrink-0 num text-[15px] text-muted px-1">{tunde(b.count)}</span>
+                )}
+              </div>
             ),
           )}
           {Object.entries(extra).map(([id, n]) => (

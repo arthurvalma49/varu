@@ -1,9 +1,13 @@
 import { isValidISO } from "./dates";
 import type { AppData, Setup } from "./types";
 
-/** Share a class setup (no absences) as a URL-safe string, for classmates. */
+/**
+ * Share code for a class setup (timetable, rule). Personal data never travels: cancelled lessons
+ * are left out (they can be private, e.g. a lesson that did not happen for you).
+ */
 export function encodeSetup(setup: Setup): string {
-  const json = JSON.stringify(setup);
+  const { cancelled: _personal, ...shared } = setup;
+  const json = JSON.stringify(shared);
   const bytes = new TextEncoder().encode(json);
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);

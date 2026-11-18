@@ -90,6 +90,8 @@ export interface Absence {
 export interface AppData {
   setup: Setup | null;
   absences: Absence[];
+  /** Tester mode: made-up data; the real data waits in storage until tester mode ends. */
+  demo?: boolean;
 }
 
 /** ok: comfortable. warn: 1-2 left. edge: 0 left, the next miss fails. over: already past the limit. */

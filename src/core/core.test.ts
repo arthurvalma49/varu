@@ -6,6 +6,7 @@ import { appendLesson, breakDays, buildSetup, cycleLesson, defaultWindow, remove
 import { eduDivisions, eduSegments, eduTimetable, edupageSchool, picksByName, ttRange, type EduData, type EduPeriod } from "./edupage";
 import ramFixture from "./fixtures/edupage-ram-9b.json";
 import paeFixture from "./fixtures/edupage-pae-9a.json";
+import { demoData } from "./demo";
 import { migrateSetup, ram9bTemplate } from "./templates";
 import type { Rule } from "./types";
 
@@ -209,11 +210,15 @@ describe("EduPage import (real public data: Tallinna Pae Gümnaasium 9.a, Nov 20
     expect(edupageSchool("../evil")).toBeNull();
   });
 
-  it("offers the group splits the student must choose from", () => {
-    const names = eduDivisions(d, cls).map((v) => v.groups.map((g) => g.name).sort().join("/"));
-    expect(names).toContain("Boys/Girls");
+  it("asks only about group splits that change the schedule, and says what each group has", () => {
+    const divs = eduDivisions(d, cls);
+    const names = divs.map((v) => v.groups.map((g) => g.name).sort().join("/"));
+    // Boys/Girls PE and Eesti 1/2 meet at the same times: not asked. English groups differ: asked.
+    expect(names).not.toContain("Boys/Girls");
+    expect(names).not.toContain("Eesti 1/Eesti 2");
     expect(names).toContain("Inglise 1/Inglise 2");
-    expect(names).toContain("Eesti 1/Eesti 2");
+    const eng = divs.find((v) => v.groups.some((g) => g.name === "Inglise 1"))!;
+    expect(eng.groups[0].lessons.map((l) => l.subject)).toContain("Inglise keel");
   });
 
   it("builds one student's week: group lessons only once, double lessons merged", () => {
@@ -293,10 +298,37 @@ describe("cancelled lessons", () => {
     expect([before.total, before.max]).toEqual([34, 8]);
     expect([after.total, after.max, after.absent]).toEqual([30, 7, 0]);
   });
+  it("never travel in a share code (they can be personal)", () => {
+    const s = { ...base, cancelled: withCancelled(undefined, "2026-11-25", { fuusika: 2 }) };
+    const back = decodeSetup(encodeSetup(s))!;
+    expect(back.cancelled).toBeUndefined();
+    expect(back.segments).toEqual(s.segments);
+  });
   it("removes just the cancelled part of a day, and can be undone", () => {
     const s = { ...base, cancelled: withCancelled(undefined, "2026-11-25", { fuusika: 2 }) };
     expect(timetableOn(s, "2026-11-25").map((l) => l.subjectId)).toContain("fuusika");
     expect(lessonsOn(s, "2026-11-25").map((l) => l.subjectId)).not.toContain("fuusika");
     expect(withCancelled(s.cancelled, "2026-11-25", { fuusika: -2 })).toEqual({});
+  });
+});
+
+describe("EduPage groups at RAM", () => {
+  it("9.b is asked one question (which B-keel), not five", () => {
+    const d = (ramFixture as unknown as EduPeriod[])[1].data as EduData;
+    const divs = eduDivisions(d, d.classes[0].id);
+    expect(divs).toHaveLength(1);
+    expect(new Set(divs[0].groups.flatMap((g) => g.lessons.map((l) => l.subject)))).toEqual(new Set(["Hispaania keel", "Prantsuse keel", "Vene keel"]));
+  });
+});
+
+describe("tester mode demo data", () => {
+  it("shows every state: at the limit, over, close and calm, plus a plan and a cancellation", () => {
+    const d = demoData("2026-11-18");
+    const rows = summary(d.setup!, d.absences, "2026-11-18");
+    const st = (id: string) => rows.find((r) => r.subject.id === id)!.status;
+    expect([st("fuusika"), st("hispaania-keel"), st("geograafia"), st("matemaatika")]).toEqual(["edge", "over", "warn", "ok"]);
+    expect(d.absences.some((a) => a.date > "2026-11-18")).toBe(true);
+    expect(Object.keys(d.setup!.cancelled ?? {})).toHaveLength(1);
+    expect(d.demo).toBe(true);
   });
 });

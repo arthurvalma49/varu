@@ -7,13 +7,13 @@ import { eduSegments } from "../core/edupage";
 import { decodeSetup } from "../core/share";
 import { emptyTimetable, ram9bTemplate } from "../core/templates";
 import type { Absence, Setup } from "../core/types";
-import { Button, Check, Icon, NavBar, Row, Section, Stepper, Switch, fmtLimit, limitPhrase, tunde, type IconName } from "./kit";
+import { Button, Check, Icon, NavBar, Row, Section, Stepper, Switch, TAB_ICONS, fmtLimit, limitPhrase, tunde, type IconName } from "./kit";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
 
 const DRAFT_KEY = "varu:draft";
 const INTRO_KEY = "varu:intro-seen";
-type Step = "intro" | "rule" | "start" | "school" | "source" | "subjects" | "timetable" | "start-counts";
+type Step = "intro" | "rule" | "tabs" | "start" | "school" | "source" | "subjects" | "timetable" | "start-counts";
 const SETUP_STEPS: Step[] = ["school", "source", "subjects", "timetable", "start-counts"];
 /** Import skips choosing subjects: they come with the timetable. */
 const flowFor = (source: SetupDraft["source"]): Step[] => (source === "manual" ? SETUP_STEPS : SETUP_STEPS.filter((x) => x !== "subjects"));
@@ -106,7 +106,9 @@ export function Onboarding({
       />
     );
 
-  if (step === "rule") return <RuleIntro onNext={() => setStep("start")} onBack={() => setStep("intro")} />;
+  if (step === "rule") return <RuleIntro onNext={() => setStep("tabs")} onBack={() => setStep("intro")} />;
+
+  if (step === "tabs") return <TabsIntro onNext={() => setStep("start")} onBack={() => setStep("rule")} />;
 
   if (step === "start") return <Start onRam9b={() => finish(ram9bTemplate())} onCode={(s) => finish(s)} onSetup={() => setStep("school")} onIntro={() => setStep("intro")} />;
 
@@ -420,6 +422,54 @@ function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
       </div>
       <Button size="lg" className="w-full mt-10" onClick={onNext}>
         Selge
+      </Button>
+    </div>
+  );
+}
+
+const TOUR: { key: keyof typeof TAB_ICONS; name: string; text: string }[] = [
+  { key: "overview", name: "Täna", text: "Tänased tunnid ja kas võid neist puududa. Järgmine tund on esile tõstetud, üks puudutus märgib puudumise." },
+  { key: "log", name: "Lisa", text: "Märgi puudumine mõnele teisele päevale, plaani mitu päeva korraga või märgi, et tund jääb ära." },
+  { key: "history", name: "Ajalugu", text: "Kõik sissekanded. Muuda, kustuta või kleebi nimekiri Stuudiumist." },
+  { key: "settings", name: "Seaded", text: "Tunniplaan, kool ja reegel. Siit jagad tunniplaani ka klassikaaslastega." },
+];
+
+/** Where things live: the real tab bar, then what each tab is for. */
+function TabsIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  return (
+    <div className="min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+16px)] fade-in">
+      <NavBar title="" onBack={onBack} />
+      <div className="px-2 flex-1">
+        <h1 className="m-0 text-[34px] leading-[40px] font-bold">Kus mis on</h1>
+        <p className="mt-3 mb-0 text-[17px] text-muted">All on neli vaadet. Enamasti piisab esimesest.</p>
+        <div className="glass mt-7 rounded-full p-1 grid grid-cols-4" aria-hidden>
+          {TOUR.map((t, i) => (
+            <div key={t.key} className={`flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full ${i === 0 ? "bg-surface-2 text-accent" : "text-ink"}`}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={i === 0 ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round">
+                <path d={TAB_ICONS[t.key]} />
+              </svg>
+              <span className="text-[10px] font-medium leading-none">{t.name}</span>
+            </div>
+          ))}
+        </div>
+        <ul className="list-none p-0 mt-8 mb-0 flex flex-col gap-6">
+          {TOUR.map((t) => (
+            <li key={t.key} className="flex gap-4 items-start">
+              <span className="shrink-0 size-11 rounded-full bg-accent-soft text-accent grid place-items-center">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d={TAB_ICONS[t.key]} />
+                </svg>
+              </span>
+              <div>
+                <div className="font-semibold text-[17px]">{t.name}</div>
+                <div className="text-[15px] text-muted leading-[20px] mt-0.5">{t.text}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <Button size="lg" className="w-full mt-10" onClick={onNext}>
+        Alusta
       </Button>
     </div>
   );

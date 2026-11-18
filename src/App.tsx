@@ -8,17 +8,17 @@ import { History } from "./ui/History";
 import { LogAbsence } from "./ui/LogAbsence";
 import { Onboarding } from "./ui/Onboarding";
 import { Overview } from "./ui/Overview";
-import { Settings } from "./ui/Settings";
+import { Settings, leaveDemo } from "./ui/Settings";
 import { ShareCard } from "./ui/ShareCard";
-import { Button, Icon, LargeTitle, cap, fmtDate, fmtLong, joinEt, tunde } from "./ui/kit";
+import { Button, Icon, LargeTitle, TAB_ICONS, cap, fmtDate, fmtLong, joinEt, tunde } from "./ui/kit";
 
 type Tab = "overview" | "log" | "history" | "settings";
 const TITLES: Record<Tab, string> = { overview: "Täna", log: "Lisa", history: "Ajalugu", settings: "Seaded" };
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: "overview", label: "Täna", icon: "M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm3 8h2m4 0h2m-8 4h2" },
-  { id: "log", label: "Lisa", icon: "M12 8v8M8 12h8M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
-  { id: "history", label: "Ajalugu", icon: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
-  { id: "settings", label: "Seaded", icon: "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4" },
+  { id: "overview", label: "Täna", icon: TAB_ICONS.overview },
+  { id: "log", label: "Lisa", icon: TAB_ICONS.log },
+  { id: "history", label: "Ajalugu", icon: TAB_ICONS.history },
+  { id: "settings", label: "Seaded", icon: TAB_ICONS.settings },
 ];
 
 function readHashSetup(): Setup | null {
@@ -133,11 +133,18 @@ export default function App() {
     if (!data.setup) return;
     const existing = data.absences.find((a) => a.date === date);
     const rest: Record<string, number> = {};
-    for (const b of missableOn(data.setup, date)) if (!existing?.lessons[b.subjectId]) rest[b.subjectId] = (rest[b.subjectId] ?? 0) + b.count;
+    const loggedLeft = { ...(existing?.lessons ?? {}) };
+    for (const b of missableOn(data.setup, date)) {
+      const used = Math.min(loggedLeft[b.subjectId] ?? 0, b.count);
+      if (used) loggedLeft[b.subjectId] -= used;
+      if (b.count - used > 0) rest[b.subjectId] = (rest[b.subjectId] ?? 0) + b.count - used;
+    }
     if (!Object.keys(rest).length) return;
     if (existing) {
       const prev = { ...existing.lessons };
-      updateAbsence(existing.id, { ...prev, ...rest });
+      const merged = { ...prev };
+      for (const [id, n] of Object.entries(rest)) merged[id] = (merged[id] ?? 0) + n;
+      updateAbsence(existing.id, merged);
       const n = Object.values(rest).reduce((x, y) => x + y, 0);
       setToast({ text: `Ülejäänud ${tunde(n)} kirjas`, undo: () => updateAbsence(existing.id, prev), key: Date.now() });
     } else logged({ id: newId(), date, lessons: rest, createdAt: new Date().toISOString() });
@@ -194,6 +201,14 @@ export default function App() {
       )}
       <main className="max-w-[640px] mx-auto px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-32 flex flex-col gap-7">
         {store.saveError && <SaveError />}
+        {data.demo && (
+          <div className="flex items-center justify-between gap-3 rounded-full bg-warn-soft pl-4 pr-1.5 py-1.5 text-[15px] -mb-3">
+            <span className="text-warn font-semibold">Testrežiim · näidisandmed</span>
+            <Button variant="quiet" className="min-h-8 px-3 text-warn" onClick={() => leaveDemo(data, replaceAll)}>
+              Välju
+            </Button>
+          </div>
+        )}
         {tab !== "settings" && <div className="-mx-4 -mb-3"><LargeTitle title={TITLES[tab]} subtitle={sub} /></div>}
         {incoming && (
           <div className="rounded-[26px] bg-surface p-5 flex flex-col gap-3 fade-in">

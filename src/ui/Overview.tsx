@@ -27,7 +27,8 @@ export function Overview({
   onCancel: (date: string, changes: Record<string, number>, label: string) => void;
 }) {
   const [showCalm, setShowCalm] = useState(false);
-  const [menu, setMenu] = useState<number | null>(null);
+  /** Open inline chooser under a lesson: more actions, or which half of a double lesson. */
+  const [menu, setMenu] = useState<{ i: number; kind: "more" | "half" } | null>(null);
 
   if (!rows.length)
     return (
@@ -56,7 +57,16 @@ export function Overview({
   const focusBlocks = focus ? lessonsOn(setup, focus) : [];
   const focusEntry = focus ? absences.find((a) => a.date === focus) : undefined;
   // Verdict on what is still open that day: lessons already logged are spent.
-  const open = focusBlocks.filter((b) => !b.selfStudy && !focusEntry?.lessons[b.subjectId]);
+  // Still-open lessons, counting what remains of a partly logged double lesson.
+  const loggedLeft = { ...(focusEntry?.lessons ?? {}) };
+  const open = focusBlocks
+    .filter((b) => !b.selfStudy)
+    .map((b) => {
+      const used = Math.min(loggedLeft[b.subjectId] ?? 0, b.count);
+      if (used) loggedLeft[b.subjectId] -= used;
+      return { ...b, count: b.count - used };
+    })
+    .filter((b) => b.count > 0);
   const partial = !!focusEntry && open.length > 0;
   const v = !focus || (focusEntry && !open.length) ? null : partial ? restVerdict() : dayVerdict(setup, rows, focus);
   function restVerdict() {
@@ -192,11 +202,32 @@ export function Overview({
                   </div>
                 );
               const r = row(b.subjectId);
-              const done = !!focusEntry?.lessons[b.subjectId];
-              const after = r ? r.left - b.count : 0;
+              // Part of a double lesson may already be logged; the rest stays skippable.
+              const logged = Math.min(focusEntry?.lessons[b.subjectId] ?? 0, b.count);
+              const remaining = b.count - logged;
+              const done = remaining <= 0;
+              const after = r ? r.left - remaining : 0;
               const ok = !r || after >= 0;
+              const oneOnly = !!r && !ok && remaining > 1 && r.left - 1 >= 0;
               const nextIsMh = !!r && r.left >= 0 && after < 0;
               const highlight = i === currentIdx || i === nextIdx;
+              const status = done
+                ? "Kirjas"
+                : !r
+                  ? "Ei lähe arvesse"
+                  : ok
+                    ? `${logged ? `${tunde(logged)} kirjas · ` : ""}${after === 0 ? "Võid · siis piiril" : `Võid · jääb ${after}`}`
+                    : oneOnly
+                      ? "Ühest võid, mõlemast ei"
+                      : nextIsMh
+                        ? `Ei · see tund = ${mh}`
+                        : "Ei · juba üle piiri";
+              const halves = Array.from({ length: b.count }, (_, k) => {
+                const n = String(Number.parseInt(b.slot, 10) + k);
+                const pt = setup.periodTimes?.[n];
+                return pt ? `${pt.start}–${pt.end}` : `${n}. tund`;
+              });
+              const open = menu?.i === i ? menu.kind : null;
               return (
                 <div key={i} className="cell">
                   <div className={`flex items-center gap-2 pl-5 pr-3 min-h-[60px] ${highlight ? "bg-accent-soft/60" : ""}`}>
@@ -208,9 +239,7 @@ export function Overview({
                     />
                     <div className="flex-1 min-w-0 py-2 pl-1">
                       <div className="truncate">{name(b.subjectId)}</div>
-                      <div className={`text-[13px] num truncate ${done ? "text-muted" : ok ? "text-ok" : "text-bad"}`}>
-                        {done ? "Kirjas" : !r ? "Ei lähe arvesse" : ok ? (after === 0 ? "Võid · siis piiril" : `Võid · jääb ${after}`) : nextIsMh ? `Ei · see tund = ${mh}` : "Ei · juba üle piiri"}
-                      </div>
+                      <div className={`text-[13px] num truncate ${done ? "text-muted" : ok ? "text-ok" : oneOnly ? "text-warn" : "text-bad"}`}>{status}</div>
                     </div>
                     {done ? (
                       <span className="text-ok shrink-0 fade-in px-2">
@@ -219,9 +248,10 @@ export function Overview({
                     ) : (
                       <>
                         <Button
-                          variant={ok ? "ghost" : "quiet"}
-                          className={`shrink-0 min-h-9 px-3.5 text-[15px] ${ok ? "" : "text-bad"}`}
-                          onClick={() => onLogLesson(focus, b.subjectId, b.count)}
+                          variant={ok || oneOnly ? "ghost" : "quiet"}
+                          className={`shrink-0 min-h-9 px-3.5 text-[15px] ${ok || oneOnly ? "" : "text-bad"}`}
+                          aria-expanded={remaining > 1 ? open === "half" : undefined}
+                          onClick={() => (remaining > 1 ? setMenu(open === "half" ? null : { i, kind: "half" }) : onLogLesson(focus, b.subjectId, remaining))}
                           aria-label={`Puudun: ${name(b.subjectId)} ${b.slot}`}
                         >
                           Puudun
@@ -229,8 +259,8 @@ export function Overview({
                         <button
                           type="button"
                           aria-label={`Muud valikud: ${name(b.subjectId)}`}
-                          aria-expanded={menu === i}
-                          onClick={() => setMenu(menu === i ? null : i)}
+                          aria-expanded={open === "more"}
+                          onClick={() => setMenu(open === "more" ? null : { i, kind: "more" })}
                           className="shrink-0 size-9 grid place-items-center rounded-full text-muted cursor-pointer active:bg-surface-2"
                         >
                           <Icon name="more" size={22} stroke={3} />
@@ -238,7 +268,38 @@ export function Overview({
                       </>
                     )}
                   </div>
-                  {menu === i && !done && (
+                  {open === "half" && !done && (
+                    <div className="px-5 pb-3 pt-1 flex flex-col gap-2 fade-in">
+                      <div className="text-[13px] text-muted">Paaristund. Millest puudud?</div>
+                      <div className="flex flex-wrap gap-2">
+                        {halves.map((label, k) => (
+                          <Button
+                            key={k}
+                            variant="ghost"
+                            className="min-h-9 text-[15px] num"
+                            onClick={() => {
+                              setMenu(null);
+                              onLogLesson(focus, b.subjectId, 1);
+                            }}
+                            aria-label={`Puudun ainult tunnist ${label}`}
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                        <Button
+                          variant={ok ? "primary" : "danger"}
+                          className="min-h-9 text-[15px]"
+                          onClick={() => {
+                            setMenu(null);
+                            onLogLesson(focus, b.subjectId, remaining);
+                          }}
+                        >
+                          Mõlemast
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {open === "more" && !done && (
                     <div className="flex flex-wrap gap-2 px-5 pb-3 pt-1 fade-in">
                       <Button
                         variant="ghost"

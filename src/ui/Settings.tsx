@@ -5,6 +5,7 @@ import { isValidISO } from "../core/dates";
 import { SCHOOLS } from "../core/schools";
 import { breakDays } from "../core/setup";
 import { decodeSetup, encodeSetup, validateData } from "../core/share";
+import { demoData } from "../core/demo";
 import { emptyTimetable, slug } from "../core/templates";
 import type { AppData, Setup } from "../core/types";
 import type { Store } from "../store";
@@ -80,7 +81,13 @@ export function Settings({ store }: { store: Store }) {
             Varukoopia
           </Row>
         </Section>
-        <ResetAll onReset={() => replaceAll({ setup: null, absences: [] })} />
+        <Section title="Testimine" footer="Näidisandmed (RAM 9.b, iga olek korraga), et äppi proovida ilma ise andmeid sisestamata. Sinu päris andmed pannakse kõrvale ja tulevad tagasi, kui testrežiimi välja lülitad.">
+          <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
+            <span>Testrežiim</span>
+            <Switch label="Testrežiim" checked={!!data.demo} onChange={(on) => (on ? enterDemo(data, replaceAll) : leaveDemo(data, replaceAll))} />
+          </div>
+        </Section>
+        {!data.demo && <ResetAll onReset={() => replaceAll({ setup: null, absences: [] })} />}
       </div>
     );
 
@@ -129,6 +136,38 @@ export function Settings({ store }: { store: Store }) {
 }
 
 type Upd = Store["updateSetup"];
+
+const REAL_KEY = "varu:real";
+
+/** Tester mode: park the real data, show demo data. */
+export function enterDemo(data: AppData, replaceAll: Store["replaceAll"]) {
+  if (data.demo) return;
+  try {
+    localStorage.setItem(REAL_KEY, JSON.stringify(data));
+  } catch {
+    return; // nowhere to park the real data: do not risk it
+  }
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  replaceAll(demoData(today));
+}
+
+/** Leave tester mode: the parked real data comes back exactly as it was. */
+export function leaveDemo(data: AppData, replaceAll: Store["replaceAll"]) {
+  if (!data.demo) return;
+  try {
+    const raw = localStorage.getItem(REAL_KEY);
+    const real = raw ? JSON.parse(raw) : null;
+    if (real && validateData(real)) {
+      replaceAll({ ...real, demo: undefined });
+      localStorage.removeItem(REAL_KEY);
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  replaceAll({ setup: null, absences: [] });
+}
 
 function RulePage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }) {
   const school = SCHOOLS.find((s) => s.id === setup.schoolId);

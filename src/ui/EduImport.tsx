@@ -55,14 +55,6 @@ async function eduData(school: string, tt: string, snapshot?: string) {
   return getJson<EduData>(`/api/edupage?school=${school}&tt=${tt}`);
 }
 
-/** "B-keel 1", "B-keel 2" -> "B-keel"; falls back to a generic title. */
-function groupTitle(names: string[]) {
-  let p = names[0] ?? "";
-  for (const n of names) while (!n.startsWith(p)) p = p.slice(0, -1);
-  p = p.replace(/[\s\d.\-–]+$/, "").trim();
-  return p.length >= 2 ? `Sinu rühm: ${p}` : "Sinu rühm";
-}
-
 async function getJson<T>(url: string): Promise<T> {
   let r: Response;
   try {
@@ -85,7 +77,8 @@ export function EduImport({
   actionLabel?: string;
   initial?: string;
 }) {
-  const [input, setInput] = useState(initial);
+  // Shown as a full address so it reads as an editable field, not a label.
+  const [input, setInput] = useState(initial && !initial.includes(".") ? `${initial}.edupage.org` : initial);
   const [finishing, setFinishing] = useState(false);
   const [phase, setPhase] = useState<Phase>({ k: "idle" });
   const [classId, setClassId] = useState("");
@@ -159,17 +152,31 @@ export function EduImport({
 
   return (
     <div className="flex flex-col gap-7">
-      <Section footer={phase.k === "error" ? <span className="text-bad">{phase.msg}</span> : "Kooli EduPage'i aadress või link tunniplaanile. Töötab, kui kool avaldab tunniplaani avalikult."}>
+      <Section
+        title="Kooli tunniplaan"
+        footer={
+          phase.k === "error" ? (
+            <span className="text-bad">{phase.msg}</span>
+          ) : (
+            "Kooli EduPage'i aadress, nt ramkool.edupage.org, või link tunniplaanile. Muuda, kui su kool on teine."
+          )
+        }
+      >
         <form
-          className="cell flex items-center gap-3 px-5 min-h-[52px]"
+          className="cell flex items-center gap-3 pl-5 pr-3 min-h-[52px]"
           onSubmit={(e) => {
             e.preventDefault();
             load();
           }}
         >
+          <label htmlFor="edu-address" className="shrink-0">
+            EduPage
+          </label>
           <input
-            className="cell-input flex-1 placeholder:text-faint"
-            placeholder="nt pae.edupage.org"
+            id="edu-address"
+            type="url"
+            className="cell-input flex-1 min-w-0 text-right text-accent text-[16px] placeholder:text-faint"
+            placeholder="kool.edupage.org"
             aria-label="Kooli EduPage aadress"
             inputMode="url"
             enterKeyHint="go"
@@ -179,7 +186,7 @@ export function EduImport({
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-          <Button type="submit" variant="ghost" className="min-h-8 px-3" disabled={!school || phase.k === "loading"}>
+          <Button type="submit" variant="ghost" className="shrink-0 min-h-8 px-3" disabled={!school || phase.k === "loading"}>
             {phase.k === "loading" ? "Otsin…" : "Otsi"}
           </Button>
         </form>
@@ -219,8 +226,12 @@ export function EduImport({
             </label>
           </Section>
 
-          {divisions.map((v) => (
-            <Section key={v.id} title={groupTitle(v.groups.map((g) => g.name))}>
+          {divisions.map((v, k) => (
+            <Section
+              key={v.id}
+              title={v.title}
+              footer={k === divisions.length - 1 ? "Küsin ainult rühmade kohta, mille tunnid on eri päevadel või eri ainetes. Muud valikud ei muuda midagi." : undefined}
+            >
               {v.groups.map((g) => (
                 <button
                   key={g.id}
@@ -228,9 +239,14 @@ export function EduImport({
                   role="radio"
                   aria-checked={picks[v.id] === g.id}
                   onClick={() => setPicks({ ...picks, [v.id]: g.id })}
-                  className="cell press flex items-center gap-3 px-5 min-h-[50px] w-full text-left cursor-pointer"
+                  className="cell press flex items-center gap-3 px-5 min-h-[56px] w-full text-left cursor-pointer"
                 >
-                  <span className="flex-1">{g.name}</span>
+                  <span className="flex-1 min-w-0 py-2">
+                    <span className="block truncate">
+                      {g.lessons.length ? g.lessons.map((l) => `${l.subject} · ${l.days}`).join("; ") : g.name}
+                    </span>
+                    {g.lessons.length > 0 && <span className="block text-[13px] text-muted">{g.name}</span>}
+                  </span>
                   <Check on={picks[v.id] === g.id} />
                 </button>
               ))}
