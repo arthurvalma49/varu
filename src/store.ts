@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { validateData } from "./core/share";
+import { migrateSetup } from "./core/templates";
 import type { Absence, AppData, Setup } from "./core/types";
 
 const KEY = "varu:v1";
@@ -9,7 +10,7 @@ function load(): AppData {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const d = JSON.parse(raw);
-      if (validateData(d)) return d;
+      if (validateData(d)) return d.setup ? { ...d, setup: migrateSetup(d.setup) } : d;
     }
   } catch {
     /* private mode or corrupted: start fresh */

@@ -7,29 +7,33 @@ import { Button, Card, Empty, fmtDate, tunde } from "./kit";
 export function History({
   setup,
   absences,
+  now,
   onRemove,
   onImport,
 }: {
   setup: Setup;
   absences: Absence[];
+  now: string;
   onRemove: (id: string) => void;
   onImport: (a: Absence[]) => void;
 }) {
-  const [confirm, setConfirm] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const name = (id: string) => setup.subjects.find((s) => s.id === id)?.name ?? id;
   const tracked = (id: string) => setup.subjects.find((s) => s.id === id)?.tracked ?? false;
   const list = [...absences].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-  const total = list.filter((e) => inWindow(setup, e.date)).reduce((s, e) => s + Object.values(e.lessons).reduce((x, n) => x + n, 0), 0);
+  const sum = (e: Absence) => Object.values(e.lessons).reduce((x, n) => x + n, 0);
+  const done = list.filter((e) => inWindow(setup, e.date) && e.date <= now).reduce((s, e) => s + sum(e), 0);
+  const planned = list.filter((e) => inWindow(setup, e.date) && e.date > now).reduce((s, e) => s + sum(e), 0);
 
   return (
     <div className="flex flex-col gap-4">
       <Card>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="text-xl font-bold m-0">Sissekanded</h2>
-            <div className="text-sm text-muted num">
-              {list.length} päeva · {tunde(total)} arvestusperioodis
+          <div className="num">
+            <div className="font-display font-bold text-xl">{tunde(done)} puudutud</div>
+            <div className="text-sm text-muted">
+              {setup.windowName}
+              {planned > 0 && ` · ${tunde(planned)} plaanis`}
             </div>
           </div>
           <Button variant="ghost" onClick={() => setImportOpen((v) => !v)} aria-expanded={importOpen}>
@@ -54,13 +58,15 @@ export function History({
         ) : (
           list.map((e, i) => {
             const counts = inWindow(setup, e.date);
+            const plan = e.date > now;
             return (
               <div key={e.id} className={`grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 items-center py-3 ${i ? "border-t border-line" : "pt-0"}`}>
-                <div className="num font-display font-bold">
+                <div className="num font-display font-bold flex items-center gap-2 flex-wrap">
                   {fmtDate(e.date, true)}
-                  {!counts && <span className="ml-2 text-xs font-body font-normal text-muted">ei lähe arvesse</span>}
+                  {plan && counts && <span className="text-xs font-body font-bold text-accent border border-dashed border-accent/60 rounded-full px-2 py-0.5">plaan</span>}
+                  {!counts && <span className="text-xs font-body font-normal text-muted">ei lähe arvesse</span>}
                 </div>
-                <Button variant="quiet" className="min-h-9 px-2 text-sm font-normal row-start-1 col-start-2" onClick={() => setConfirm(e.id)} aria-label="Kustuta sissekanne">
+                <Button variant="quiet" className="px-2 text-sm font-normal row-start-1 col-start-2" onClick={() => onRemove(e.id)} aria-label={`Kustuta ${fmtDate(e.date)}`}>
                   Kustuta
                 </Button>
                 <div className="min-w-0 col-span-2">
@@ -68,7 +74,7 @@ export function History({
                     {Object.entries(e.lessons).map(([id, n]) => (
                       <span
                         key={id}
-                        className={`text-[13px] px-2 py-0.5 rounded-full ${counts && tracked(id) ? "bg-accent-soft" : "border border-dashed border-line text-muted"}`}
+                        className={`text-[13px] px-2 py-0.5 rounded-full ${counts && tracked(id) && !plan ? "bg-accent-soft" : "border border-dashed border-line text-muted"}`}
                       >
                         {name(id)} ×{n}
                       </span>
@@ -76,24 +82,6 @@ export function History({
                   </div>
                   {e.note && <div className="text-sm text-muted mt-1">{e.note}</div>}
                 </div>
-                {confirm === e.id && (
-                  <div className="col-span-2 flex items-center gap-2 flex-wrap text-sm fade-in">
-                    <span>Kustutan selle sissekande?</span>
-                    <Button
-                      variant="danger"
-                      className="min-h-9"
-                      onClick={() => {
-                        onRemove(e.id);
-                        setConfirm(null);
-                      }}
-                    >
-                      Kustuta
-                    </Button>
-                    <Button variant="ghost" className="min-h-9" onClick={() => setConfirm(null)}>
-                      Ei
-                    </Button>
-                  </div>
-                )}
               </div>
             );
           })

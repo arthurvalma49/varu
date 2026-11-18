@@ -24,6 +24,8 @@ export interface Subject {
   name: string;
   /** Counted toward the rule. Untracked subjects can still be logged. */
   tracked: boolean;
+  /** Counted, but a miss matters less (graded only at year end, or not graded). Never headlines the overview. */
+  advisory?: boolean;
   note?: string;
 }
 
@@ -82,15 +84,17 @@ export interface AppData {
   absences: Absence[];
 }
 
-export type Status = "ok" | "warn" | "bad";
+/** ok: comfortable. warn: 1-2 left. edge: 0 left, the next miss fails. over: already past the limit. */
+export type Status = "ok" | "warn" | "edge" | "over";
 
 export interface SubjectRow {
   subject: Subject;
   total: number;
   held: number; // lessons held up to today
-  absent: number;
+  absent: number; // missed so far (entries dated today or earlier)
+  planned: number; // entries dated after today: plans that count once the day passes
   max: number; // max absences while staying within the rule
-  left: number; // max - absent (negative = over)
-  pct: number;
+  left: number; // max - absent - planned (negative = over)
+  pct: number; // absent / total
   status: Status;
 }

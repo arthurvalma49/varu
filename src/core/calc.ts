@@ -1,4 +1,4 @@
-import { eachDay, isSchoolWeekday, weekdayOf } from "./dates";
+import { addDays, eachDay, isSchoolWeekday, weekdayOf } from "./dates";
 import type {
   Absence,
   Fraction,
@@ -29,8 +29,9 @@ export function fractionToPct(f: Fraction): number {
   return (f.num / f.den) * 100;
 }
 
+/** One threshold table for every screen: 0 left is its own state because the next miss fails. */
 export function statusOf(left: number): Status {
-  return left <= 0 ? "bad" : left <= 2 ? "warn" : "ok";
+  return left < 0 ? "over" : left === 0 ? "edge" : left <= 2 ? "warn" : "ok";
 }
 
 export function segmentFor(setup: Setup, ds: ISODate): Segment | null {
@@ -79,10 +80,12 @@ export function inWindow(setup: Setup, ds: ISODate): boolean {
   return ds >= setup.windowStart && ds <= setup.windowEnd;
 }
 
-export function absenceCounts(setup: Setup, absences: Absence[]): Record<string, number> {
+/** Lesson counts per subject. With `now`, `when` picks past+today ("done") or future ("planned") entries. */
+export function absenceCounts(setup: Setup, absences: Absence[], now?: ISODate, when: "done" | "planned" = "done"): Record<string, number> {
   const a: Record<string, number> = {};
   for (const e of absences) {
     if (!inWindow(setup, e.date)) continue;
+    if (now && (when === "done" ? e.date > now : e.date <= now)) continue;
     for (const [id, n] of Object.entries(e.lessons)) a[id] = (a[id] ?? 0) + (Number(n) || 0);
   }
   return a;
@@ -91,19 +94,22 @@ export function absenceCounts(setup: Setup, absences: Absence[]): Record<string,
 export function summary(setup: Setup, absences: Absence[], now: ISODate): SubjectRow[] {
   const T = totals(setup);
   const H = heldSoFar(setup, now);
-  const A = absenceCounts(setup, absences);
+  const A = absenceCounts(setup, absences, now, "done");
+  const P = absenceCounts(setup, absences, now, "planned");
   const rows = setup.subjects
     .filter((s) => s.tracked)
     .map((subject) => {
       const total = T[subject.id] ?? 0;
       const absent = A[subject.id] ?? 0;
+      const planned = P[subject.id] ?? 0;
       const max = maxAllowed(total, setup.rule);
-      const left = max - absent;
+      const left = max - absent - planned;
       return {
         subject,
         total,
         held: H[subject.id] ?? 0,
         absent,
+        planned,
         max,
         left,
         pct: total ? absent / total : 0,
@@ -164,10 +170,56 @@ export function preview(setup: Setup, rows: SubjectRow[], date: ISODate, sel: Re
     .map(([subjectId, add]) => {
       const r = byId.get(subjectId);
       if (!r) return { subjectId, add, absentAfter: 0, total: 0, leftAfter: 0, counted: false };
-      const absentAfter = r.absent + (counts ? add : 0);
+      const absentAfter = r.absent + r.planned + (counts ? add : 0);
       return { subjectId, add, absentAfter, total: r.total, leftAfter: r.max - absentAfter, counted: counts };
     });
   const over = lines.filter((l) => l.counted && l.leftAfter < 0).map((l) => l.subjectId);
   const total = lines.reduce((s, l) => s + l.add, 0);
   return { lines, over, total, counts };
+}
+
+/** Lessons on a date that a student can actually miss (not self-study). */
+export function missableOn(setup: Setup, ds: ISODate): Lesson[] {
+  return lessonsOn(setup, ds).filter((b) => !b.selfStudy);
+}
+
+/** First date after `from` (exclusive) with missable lessons, within the window, skipping `skip` dates. */
+export function nextSchoolDay(setup: Setup, from: ISODate, skip: ReadonlySet<ISODate> = new Set()): ISODate | null {
+  for (let d = addDays(from, 1); d <= setup.windowEnd; d = addDays(d, 1)) if (!skip.has(d) && missableOn(setup, d).length) return d;
+  return null;
+}
+
+/** Next date after `from` (exclusive) that has a missable lesson of this subject. */
+export function nextLesson(setup: Setup, subjectId: string, from: ISODate): ISODate | null {
+  for (let d = addDays(from, 1); d <= setup.windowEnd; d = addDays(d, 1))
+    if (missableOn(setup, d).some((b) => b.subjectId === subjectId)) return d;
+  return null;
+}
+
+export interface DayVerdict {
+  date: ISODate;
+  /** Missable lessons that day, all subjects. */
+  lessons: number;
+  /** Graded subjects that would newly go over the limit if the whole day is missed. */
+  blockers: string[];
+  /** Graded subject with the least left after missing the day (null if none counted). */
+  tightest: { subjectId: string; leftAfter: number } | null;
+}
+
+/** "Can I skip this whole day?" Advisory subjects never block. */
+export function dayVerdict(setup: Setup, rows: SubjectRow[], date: ISODate): DayVerdict {
+  const blocks = missableOn(setup, date);
+  const per: Record<string, number> = {};
+  for (const b of blocks) per[b.subjectId] = (per[b.subjectId] ?? 0) + b.count;
+  const blockers: string[] = [];
+  let tightest: DayVerdict["tightest"] = null;
+  for (const r of rows) {
+    const k = per[r.subject.id];
+    if (!k || r.subject.advisory) continue;
+    const leftAfter = r.left - k;
+    // Only subjects that would newly cross the limit block the day; one already over is lost either way.
+    if (r.left >= 0 && leftAfter < 0) blockers.push(r.subject.id);
+    if (!tightest || leftAfter < tightest.leftAfter) tightest = { subjectId: r.subject.id, leftAfter };
+  }
+  return { date, lessons: blocks.reduce((s, b) => s + b.count, 0), blockers, tightest };
 }

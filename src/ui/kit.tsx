@@ -4,6 +4,8 @@ import type { Fraction, Rule, Status } from "../core/types";
 
 export const WD_SHORT = ["P", "E", "T", "K", "N", "R", "L"];
 export const WD_LONG = ["pühapäev", "esmaspäev", "teisipäev", "kolmapäev", "neljapäev", "reede", "laupäev"];
+/** "on Monday" (adessive), for sentences like "Esmaspäeval võid puududa". */
+export const WD_ON = ["pühapäeval", "esmaspäeval", "teisipäeval", "kolmapäeval", "neljapäeval", "reedel", "laupäeval"];
 const MON = ["jaan", "veebr", "märts", "apr", "mai", "juuni", "juuli", "aug", "sept", "okt", "nov", "dets"];
 
 export const tunde = (n: number) => (Math.abs(n) === 1 ? `${n} tund` : `${n} tundi`);
@@ -18,8 +20,29 @@ export function fmtLimit(f: Fraction) {
   const p = fractionToPct(f);
   return (Number.isInteger(p) ? String(p) : p.toFixed(1).replace(".", ",")) + "%";
 }
-export function ruleLabel(r: Rule) {
-  return `${r.mode === "gte" ? "Alla" : "Kuni"} ${fmtLimit(r.limit)}`;
+/** Plain wording of where the limit is: "25% või rohkem = MH". */
+export function limitPhrase(r: Rule) {
+  const where = r.mode === "gte" ? `${fmtLimit(r.limit)} või rohkem` : `üle ${fmtLimit(r.limit)}`;
+  return `${where} = ${r.automatic ? "MH" : "õpetaja otsus"}`;
+}
+export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** "Füüsika", "Füüsika ja Keemia", "Füüsika, Keemia ja Geograafia". */
+export function joinEt(xs: string[]) {
+  return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} ja ${xs[xs.length - 1]}`;
+}
+
+const ICONS = {
+  left: "m15 18-6-6 6-6",
+  right: "m9 18 6-6-6-6",
+  x: "M18 6 6 18M6 6l12 12",
+  plus: "M12 5v14M5 12h14",
+} as const;
+export function Icon({ name, size = 20 }: { name: keyof typeof ICONS; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={ICONS[name]} />
+    </svg>
+  );
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -49,20 +72,31 @@ export function Button({
 const PILL: Record<Status, string> = {
   ok: "bg-ok-soft text-ok",
   warn: "bg-warn-soft text-warn",
-  bad: "bg-bad-soft text-bad",
+  edge: "bg-bad-soft text-bad",
+  over: "bg-bad text-bad-ink",
 };
+/** Display face for the numbers: Atkinson's slashed zero reads like "Ø" in "0 varu". */
 export function Pill({ status, children }: { status: Status; children: ReactNode }) {
-  return <span className={`num text-sm font-bold px-2.5 py-1 rounded-full whitespace-nowrap self-start ${PILL[status]}`}>{children}</span>;
+  return (
+    <span className={`num font-display text-[15px] leading-none font-bold px-2.5 py-1.5 rounded-full whitespace-nowrap self-start ${PILL[status]}`}>{children}</span>
+  );
 }
+/** Short label for how many lessons are left: "5 varu", "piiril", "2 üle". */
+export const leftLabel = (left: number) => (left < 0 ? `${-left} üle` : left === 0 ? "piiril" : `${left} varu`);
 
-const BAR: Record<Status, string> = { ok: "bg-accent", warn: "bg-warn", bad: "bg-bad" };
-/** Scale so the limit line sits at 62.5% of the track, leaving room to show "over". */
-export function Meter({ pct: p, limitPct, status, label }: { pct: number; limitPct: number; status: Status; label: string }) {
+const BAR: Record<Status, string> = { ok: "bg-ok", warn: "bg-warn", edge: "bg-bad", over: "bg-bad" };
+/**
+ * Missed share of the half-year's lessons. The limit line sits at 62.5% of the track so
+ * "over" still has room; planned lessons show as a faded extension after the missed ones.
+ */
+export function Meter({ pct: p, planPct = 0, limitPct, status, label }: { pct: number; planPct?: number; limitPct: number; status: Status; label: string }) {
   const scale = limitPct * 1.6;
   const w = Math.min(p / scale, 1) * 100;
+  const wp = Math.min((p + planPct) / scale, 1) * 100 - w;
   return (
     <div className="relative h-2 rounded-full bg-surface-2 mt-1" role="img" aria-label={label}>
       <i className={`anim absolute inset-y-0 left-0 rounded-full ${BAR[status]}`} style={{ width: `${w}%` }} />
+      {wp > 0 && <i className={`anim absolute inset-y-0 rounded-full opacity-40 ${BAR[status]}`} style={{ left: `${w}%`, width: `${wp}%` }} />}
       <span className="absolute -top-1 -bottom-1 w-[3px] rounded bg-bad" style={{ left: "62.5%" }} />
     </div>
   );

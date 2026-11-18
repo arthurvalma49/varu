@@ -10,7 +10,13 @@ export function slug(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-const S = (name: string, note?: string, tracked = true): Subject => ({ id: slug(name), name, tracked, note });
+const S = (name: string, note?: string, tracked = true, advisory = false): Subject => ({
+  id: slug(name),
+  name,
+  tracked,
+  note,
+  ...(advisory ? { advisory } : {}),
+});
 const L = (name: string, count: number, slot: string, selfStudy = false): Lesson => ({
   subjectId: slug(name),
   count,
@@ -59,8 +65,8 @@ export function ram9bTemplate(): Setup {
       S("Ajalugu"),
       S("Ühiskonnaõpetus"),
       S("Kehaline kasvatus"),
-      S("Muusika", "Hinne alles aasta lõpus, tegelik varu on suurem."),
-      S("Klassijuhataja tund", "Hinnet ei saa, seega MH reegel ei pruugi kehtida."),
+      S("Muusika", "Hinne alles aasta lõpus, tegelik varu on suurem.", true, true),
+      S("Klassijuhataja tund", "Hinnet ei saa, seega MH reegel ei pruugi kehtida.", true, true),
       S("Kunst", "Hinne pandi juba 1. perioodi lõpus.", false),
       S("Tööõpetus", "Ei lähe poolaasta arvestusse.", false),
     ],
@@ -108,4 +114,12 @@ export function blankSetup(schoolId: string): Setup {
     segments: [{ id: "s1", name: "Tunniplaan", start: `${y}-09-01`, end: `${y + 1}-01-25`, timetable: emptyTimetable() }],
     holidays: [],
   };
+}
+
+/** Upgrade setups saved by older versions. v0.1 RAM 9.b setups had no `advisory` flag. */
+export function migrateSetup(s: Setup): Setup {
+  if (s.schoolId === "ram")
+    for (const sub of s.subjects)
+      if (sub.advisory === undefined && (sub.id === "muusika" || sub.id === "klassijuhataja-tund")) sub.advisory = true;
+  return s;
 }

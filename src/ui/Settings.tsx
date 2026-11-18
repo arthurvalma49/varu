@@ -232,10 +232,20 @@ export function Settings({ store }: { store: Store }) {
                 />
                 <span className="num w-8 text-right">{T[s.id] ?? 0}</span>
               </label>
+              <label className="flex items-center min-h-11 px-1 cursor-pointer" title="Vähem tähtis: nt hinne alles aasta lõpus. Ei tõuse ülevaates esile.">
+                <input
+                  type="checkbox"
+                  aria-label={`${s.name}: vähem tähtis`}
+                  className="size-5 accent-[var(--accent)]"
+                  checked={!!s.advisory}
+                  disabled={!s.tracked}
+                  onChange={(e) => updateSetup((d) => void (d.subjects[i].advisory = e.target.checked || undefined))}
+                />
+              </label>
             </div>
           </div>
         ))}
-        <div className="text-[13px] text-muted -mt-1">Veerud: nimi · tunde varem · arvestatakse · kokku</div>
+        <div className="text-[13px] text-muted -mt-1">Veerud: nimi · tunde varem · arvestatakse · kokku · vähem tähtis (nt hinne alles aasta lõpus)</div>
         <AddSubject
           onAdd={(name) =>
             updateSetup((d) => {
