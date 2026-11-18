@@ -32,6 +32,7 @@ Done and working:
 - Overview: verdict sentence for the next free school day, every subject at 0 named with its next lesson date, one-tap "Täna puudun", grouped subject list, advisory subjects ("Vähem tähtis") never headline.
 - Lisa: Täna/Homme chips, a sticky verdict and save bar, a red action when saving goes over the limit. Ajalugu: edit, and delete with undo. Seaded: the same tap-to-build timetable editor, holidays shown as ranges plus a one-tap national-breaks button.
 - EduPage import (`src/core/edupage.ts`, UI `src/ui/EduImport.tsx`, proxy `api/edupage.js` as a Vercel function because EduPage sends no CORS headers). RAM is at ramkool.edupage.org; at least 62 Estonian schools publish timetables there. The import reads every timetable published in the grading window (RAM: I and II periood) as separate periods, maps "(i)" subjects to iseõpe, and asks the student for their group in each split. Tested against real fixtures (Pae 9.a, RAM 9.b). EduPage's endpoints are unofficial and may change.
+- EduPage often refuses connections from Vercel's cloud servers (timeouts from both arn1 and fra1, while home connections work), so the live proxy is best-effort. RAM therefore ships a static snapshot in `public/edupage/ramkool/`, which the import reads first. **When RAM publishes a new period (e.g. III periood in January), run `node scripts/edupage-snapshot.mjs ramkool` from a home machine, commit and push.** Other schools use the live proxy.
 - 26 vitest tests. `npm test` and `npm run build` pass.
 
 Known gaps:

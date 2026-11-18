@@ -23,7 +23,7 @@ const postOnce = (school, path, args) =>
         path: `/timetable/server/${path}`,
         method: "POST",
         family: 4,
-        timeout: 8000,
+        timeout: 5000,
         headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
       },
       (res) => {

@@ -15,7 +15,7 @@ type Phase =
   | { k: "idle" }
   | { k: "loading" }
   | { k: "error"; msg: string }
-  | { k: "ready"; data: EduData; list: EduTimetableInfo[]; all: EduTimetableInfo[]; tt: string };
+  | { k: "ready"; data: EduData; list: EduTimetableInfo[]; all: EduTimetableInfo[]; tt: string; snapshot?: string };
 
 const ERRORS: Record<string, string> = {
   "bad-request": "See ei näe välja nagu EduPage aadress. Proovi nt pae.edupage.org.",
@@ -24,6 +24,34 @@ const ERRORS: Record<string, string> = {
   "edupage-unreachable": "EduPage ei vastanud. Kontrolli aadressi või proovi hiljem.",
   offline: "Internetiühendus puudub. Import vajab internetti.",
 };
+
+/** A static snapshot shipped with the app (public/edupage/<school>/), or null when there is none. */
+async function snapshotJson<T>(url: string): Promise<T | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok || !(r.headers.get("content-type") ?? "").includes("json")) return null;
+    return (await r.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Timetable data: the shipped snapshot first (instant, and EduPage often refuses cloud servers),
+ * then the live proxy.
+ */
+async function eduList(school: string) {
+  const snap = await snapshotJson<{ defaultTt: string; timetables: EduTimetableInfo[]; snapshot?: string }>(`/edupage/${school}/index.json`);
+  if (snap?.timetables?.length) return snap;
+  return getJson<{ defaultTt: string; timetables: EduTimetableInfo[]; snapshot?: string }>(`/api/edupage?school=${school}`);
+}
+async function eduData(school: string, tt: string, snapshot?: string) {
+  if (snapshot) {
+    const d = await snapshotJson<EduData>(`/edupage/${school}/${tt}.json`);
+    if (d) return d;
+  }
+  return getJson<EduData>(`/api/edupage?school=${school}&tt=${tt}`);
+}
 
 /** "B-keel 1", "B-keel 2" -> "B-keel"; falls back to a generic title. */
 function groupTitle(names: string[]) {
@@ -69,18 +97,20 @@ export function EduImport({
       let list: EduTimetableInfo[];
       let all: EduTimetableInfo[];
       let chosen: string;
+      let snapshot: string | undefined;
       if (phase.k === "ready" && tt) {
-        ({ list, all } = phase);
+        ({ list, all, snapshot } = phase);
         chosen = tt;
       } else {
-        const r = await getJson<{ defaultTt: string; timetables: EduTimetableInfo[] }>(`/api/edupage?school=${school}`);
+        const r = await eduList(school);
         all = r.timetables;
+        snapshot = r.snapshot;
         list = all.filter((t) => !t.hidden);
         if (!list.length) list = all.slice(-1);
         chosen = list.some((t) => t.tt_num === r.defaultTt) ? r.defaultTt : list[list.length - 1].tt_num;
       }
-      const data = await getJson<EduData>(`/api/edupage?school=${school}&tt=${chosen}`);
-      setPhase({ k: "ready", data, list, all, tt: chosen });
+      const data = await eduData(school, chosen, snapshot);
+      setPhase({ k: "ready", data, list, all, tt: chosen, snapshot });
       setClassId("");
       setPicks({});
     } catch (e) {
@@ -116,7 +146,7 @@ export function EduImport({
     const periods: EduPeriod[] = [{ info: chosenInfo, data: ready.data }];
     for (const t of others) {
       try {
-        periods.push({ info: t, data: await getJson<EduData>(`/api/edupage?school=${school}&tt=${t.tt_num}`) });
+        periods.push({ info: t, data: await eduData(school!, t.tt_num, ready.snapshot) });
       } catch {
         /* an older period that will not load: the setup still works with the rest */
       }
@@ -210,7 +240,7 @@ export function EduImport({
               footer={
                 result.skippedAlternating
                   ? `${result.skippedAlternating} tundi toimub üle nädala ja jäi välja, et piir ei tuleks liiga lõdvalt. Lisa need hiljem käsitsi, kui vaja.`
-                  : "Loen ka selle õppeaasta varasemad tunniplaanid, et tundide arv oleks kogu perioodi kohta õige. Ühekordseid üritusi tunniplaan ei tea."
+                  : `${ready.snapshot ? `Kooli tunniplaan seisuga ${ready.snapshot.split("-").reverse().join(".")}. ` : ""}Loen ka selle õppeaasta varasemad tunniplaanid, et tundide arv oleks kogu perioodi kohta õige. Ühekordseid üritusi tunniplaan ei tea.`
               }
             >
               <Row detail={<span className="num">{result.subjects.length}</span>}>Ained</Row>
