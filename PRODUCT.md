@@ -44,6 +44,8 @@ Data entry is manual logging plus paste import from Stuudium/eKool. No automatic
 
 - Name: undecided (18 Nov 2026). The user asked to keep the app without a name for now: no product name in the UI copy. "Varu" remains only as the working repo name and the home-screen label until a name is chosen.
 - Voice: "can I skip?" An honest friend for the student's own use, blunt at the limit, never moralizing about attendance. Not framed for teachers or parents.
+- Personality (chosen 18 Nov 2026): cheeky friend. A bit of humour in small places (empty states, toasts), always clear at the limit.
+- Branding is deferred (18 Nov 2026): no name, no icon yet. Rejected so far, do not re-propose: round 1 (a day's lessons with one empty slot, a ticket, a fuel gauge, a calendar with a check: "not unique nor recognisable") and round 2 (tally marks with a slash, an empty tipped-back chair, a door ajar with light, a wink face). Next round should start from what the user names as icons they love.
 - Visual standard (chosen 18 Nov 2026): the iOS standard, executed straight. It should sit alongside Apple's own apps (Weather, Fitness, Health): system type, grouped lists, native-feeling controls. Small distinctive details may be added later on top, never a costume.
 
 ## Evidence on Hand
