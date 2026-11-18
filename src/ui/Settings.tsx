@@ -55,37 +55,37 @@ export function Settings({ store }: { store: Store }) {
         </div>
         <Section className="[--sep-inset:62px]" title="Kool">
           <Row onClick={() => open("rule")} chevron detail={<span className="num">{fmtLimit(setup.rule.limit)}</span>}>
-            <IconLabel icon="building" color="#0a84ff">Kool ja reegel</IconLabel>
+            <IconLabel icon="building">Kool ja reegel</IconLabel>
           </Row>
           <Row onClick={() => open("window")} chevron detail={<span className="truncate max-w-[40vw] inline-block align-bottom">{setup.windowName}</span>}>
-            <IconLabel icon="calendar" color="#ff9500">Periood</IconLabel>
+            <IconLabel icon="calendar">Periood</IconLabel>
           </Row>
         </Section>
         <Section className="[--sep-inset:62px]" title="Tunniplaan" footer="Import loeb kooli tunniplaani edupage.org-ist (nt RAM: ramkool). Pärast saad seda muuta.">
           <Row onClick={() => open("edupage")} chevron>
-            <IconLabel icon="download" color="#30b0c7">Impordi EduPage'ist</IconLabel>
+            <IconLabel icon="download">Impordi EduPage'ist</IconLabel>
           </Row>
           <Row onClick={() => open("subjects")} chevron detail={<span className="num">{setup.subjects.filter((s) => s.tracked).length}</span>}>
-            <IconLabel icon="book" color="#34c759">Ained</IconLabel>
+            <IconLabel icon="book">Ained</IconLabel>
           </Row>
           <Row onClick={() => open("timetable")} chevron detail={<span className="num">{setup.segments.length}</span>}>
-            <IconLabel icon="grid" color="#5856d6">Tunniplaan</IconLabel>
+            <IconLabel icon="grid">Tunniplaan</IconLabel>
           </Row>
           <Row onClick={() => open("holidays")} chevron detail={<span className="num">{setup.holidays.length + Object.keys(setup.cancelled ?? {}).length}</span>}>
-            <IconLabel icon="calendarX" color="#ff3b30">Vabad päevad</IconLabel>
+            <IconLabel icon="calendarX">Vabad päevad</IconLabel>
           </Row>
         </Section>
         <Section className="[--sep-inset:62px]" title="Andmed" footer="Kõik on ainult selles seadmes. Klassikaaslastega jagad ainult tunniplaani ja reeglit, mitte puudumisi.">
           <Row onClick={() => open("share")} chevron>
-            <IconLabel icon="share" color="#34c759">Jaga klassiga</IconLabel>
+            <IconLabel icon="share">Jaga klassiga</IconLabel>
           </Row>
           <Row onClick={() => open("backup")} chevron>
-            <IconLabel icon="archive" color="#8e8e93">Varukoopia</IconLabel>
+            <IconLabel icon="archive">Varukoopia</IconLabel>
           </Row>
         </Section>
         <Section className="[--sep-inset:62px]" title="Testimine" footer="Näidisandmed (RAM 9.b, iga olek korraga), et äppi proovida ilma ise andmeid sisestamata. Sinu päris andmed pannakse kõrvale ja tulevad tagasi, kui testrežiimi välja lülitad.">
           <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-            <IconLabel icon="flask" color="#af52de">Testrežiim</IconLabel>
+            <IconLabel icon="flask">Testrežiim</IconLabel>
             <Switch label="Testrežiim" checked={!!data.demo} onChange={(on) => (on ? enterDemo(data, replaceAll) : leaveDemo(data, replaceAll))} />
           </div>
         </Section>
@@ -683,11 +683,11 @@ function ResetAll({ onReset }: { onReset: () => void }) {
   );
 }
 
-/** Settings row label with its coloured icon. */
-function IconLabel({ icon, color, children }: { icon: Parameters<typeof SettingsIcon>[0]["name"]; color: string; children: string }) {
+/** Settings row label with its icon; one colour for all icons keeps the list calm. */
+function IconLabel({ icon, children }: { icon: Parameters<typeof SettingsIcon>[0]["name"]; children: string }) {
   return (
     <span className="flex items-center gap-3">
-      <SettingsIcon name={icon} color={color} />
+      <SettingsIcon name={icon} color="var(--accent)" />
       {children}
     </span>
   );
