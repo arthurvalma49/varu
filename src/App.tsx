@@ -310,7 +310,7 @@ export default function App() {
         <div
           key={toast.key}
           role="status"
-          className="toast-in fixed z-20 inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+82px)] max-w-[420px] mx-auto rounded-[24px] bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-2.5 pr-1.5 py-1.5 flex items-center gap-2.5 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
+          className="toast-in fixed z-20 inset-x-4 bottom-[calc(var(--tabbar-bottom)+72px)] max-w-[420px] mx-auto rounded-[24px] bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-2.5 pr-1.5 py-1.5 flex items-center gap-2.5 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
         >
           <span className="shrink-0 size-6 rounded-full bg-[#30d158] text-black grid place-items-center">
             <Icon name="check" size={14} stroke={3} />
@@ -331,7 +331,7 @@ export default function App() {
         </div>
       )}
 
-      <nav className="fixed z-10 inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+10px)] px-5 pointer-events-none" aria-label="Põhimenüü">
+      <nav className="fixed z-10 inset-x-0 bottom-(--tabbar-bottom) px-5 pointer-events-none" aria-label="Põhimenüü">
         <div className="glass pointer-events-auto max-w-[340px] mx-auto rounded-full p-1 grid grid-cols-3 relative">
           <span
             aria-hidden

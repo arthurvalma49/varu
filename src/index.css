@@ -366,6 +366,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .no-callout {
   -webkit-touch-callout: none;
 }
+/* Floating tab bar sits partly inside the home-indicator area, as iOS 26 does. */
+:root {
+  --tabbar-bottom: max(10px, calc(env(safe-area-inset-bottom) - 12px));
+}
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
