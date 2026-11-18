@@ -8,15 +8,49 @@
  *   GET /api/edupage?school=pae&tt=334   -> EduData (see src/core/edupage.ts)
  */
 
-const post = async (school, path, args) => {
-  const r = await fetch(`https://${school}.edupage.org/timetable/server/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ __args: args, __gsh: "00000000" }),
-    signal: AbortSignal.timeout(12000),
+import { request } from "node:https";
+
+/**
+ * POST to EduPage over IPv4 only. EduPage (Hetzner) also has an IPv6 address, and Vercel's
+ * functions have no IPv6 route: when Node picked it, connections hung until a 10 s timeout.
+ */
+const postOnce = (school, path, args) =>
+  new Promise((resolve, reject) => {
+    const body = JSON.stringify({ __args: args, __gsh: "00000000" });
+    const req = request(
+      {
+        host: `${school}.edupage.org`,
+        path: `/timetable/server/${path}`,
+        method: "POST",
+        family: 4,
+        timeout: 8000,
+        headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          if (res.statusCode !== 200) return reject(Object.assign(new Error(`edupage ${res.statusCode}`), { code: `HTTP_${res.statusCode}` }));
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+          } catch {
+            reject(Object.assign(new Error("bad json"), { code: "BAD_JSON" }));
+          }
+        });
+      },
+    );
+    req.on("timeout", () => req.destroy(Object.assign(new Error("timeout"), { code: "TIMEOUT" })));
+    req.on("error", reject);
+    req.end(body);
   });
-  if (!r.ok) throw new Error(`edupage ${r.status}`);
-  return r.json();
+
+const post = async (school, path, args) => {
+  try {
+    return await postOnce(school, path, args);
+  } catch (e) {
+    if (e?.code === "ENOTFOUND") throw e; // no such school: retrying will not help
+    return postOnce(school, path, args);
+  }
 };
 
 const pick = (rows, keys) => (rows || []).map((r) => Object.fromEntries(keys.map((k) => [k, r[k]])));
@@ -70,7 +104,7 @@ export default async function handler(req, res) {
     res.status(200).send(JSON.stringify(out));
   } catch (e) {
     // The reason (e.g. a timeout or a refused connection) helps tell a school typo from EduPage blocking us.
-    const reason = e?.cause?.code || e?.name || String(e?.message || "unknown").slice(0, 80);
-    res.status(502).send(JSON.stringify({ error: "edupage-unreachable", reason }));
+    const reason = e?.code || e?.cause?.code || e?.name || String(e?.message || "unknown").slice(0, 80);
+    res.status(reason === "ENOTFOUND" ? 404 : 502).send(JSON.stringify({ error: reason === "ENOTFOUND" ? "no-public-timetable" : "edupage-unreachable", reason }));
   }
 }
