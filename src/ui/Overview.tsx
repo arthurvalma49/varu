@@ -1,43 +1,30 @@
 import { useState } from "react";
-import { dayCapacity, dayVerdict, fractionToPct, missableOn, nextLesson, nextSchoolDay, planningSegment } from "../core/calc";
+import { dayCapacity, dayVerdict, fractionToPct, lessonsOn, missableOn, nextLesson, nextSchoolDay, planningSegment } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
-import type { Setup, SubjectRow, Weekday } from "../core/types";
-import { Button, Card, Empty, Meter, Pill, WD_ON, WD_SHORT, cap, fmtDate, fmtLimit, joinEt, leftLabel, limitPhrase, pct, tunde } from "./kit";
+import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
+import { Button, Card, Empty, Icon, Meter, Pill, Row, Section, WD_ON, WD_SHORT, cap, fmtDate, fmtLimit, joinEt, leftLabel, limitPhrase, pct, tunde } from "./kit";
 
-function blockSizes(setup: Setup, segId: string | undefined, subjectId: string) {
-  const seg = setup.segments.find((s) => s.id === segId);
-  const sizes = new Set<number>();
-  for (const day of Object.values(seg?.timetable ?? {})) for (const b of day) if (b.subjectId === subjectId && !b.selfStudy) sizes.add(b.count);
-  return [...sizes];
-}
+/** After this hour the list switches from today to the next school day. Lessons have order, not clock times. */
+const SCHOOL_DAY_OVER = 15;
 
 export function Overview({
   setup,
   rows,
+  absences,
   now,
-  loggedDates,
   onLog,
-  onSkipToday,
+  onSkipDay,
+  onLogLesson,
 }: {
   setup: Setup;
   rows: SubjectRow[];
+  absences: Absence[];
   now: string;
-  /** Dates that already have an entry (missed or planned). */
-  loggedDates: ReadonlySet<string>;
   onLog: () => void;
-  onSkipToday: () => void;
+  onSkipDay: (date: string) => void;
+  onLogLesson: (date: string, subjectId: string, count: number) => void;
 }) {
   const [showCalm, setShowCalm] = useState(false);
-  const seg = planningSegment(setup, now);
-  const capacity = dayCapacity(setup, rows, seg);
-  const limitPct = fractionToPct(setup.rule.limit) / 100;
-  const schoolDaysLeft =
-    now > setup.windowEnd
-      ? 0
-      : eachDay(now > setup.windowStart ? now : setup.windowStart, setup.windowEnd).filter((d) => {
-          const w = new Date(d + "T12:00").getDay();
-          return w >= 1 && w <= 5 && !setup.holidays.includes(d);
-        }).length;
 
   if (!rows.length)
     return (
@@ -47,170 +34,235 @@ export function Overview({
     );
 
   const name = (id: string) => setup.subjects.find((s) => s.id === id)?.name ?? id;
-  const graded = rows.filter((r) => !r.subject.advisory);
-  const over = graded.filter((r) => r.left < 0);
-  const edge = graded.filter((r) => r.left === 0);
+  const row = (id: string) => rows.find((r) => r.subject.id === id);
+  const seg = planningSegment(setup, now);
+  const capacity = dayCapacity(setup, rows, seg);
+  const limitPct = fractionToPct(setup.rule.limit) / 100;
   const mh = setup.rule.automatic ? "MH" : "üle piiri";
 
-  // The next school day that has no entry yet: a day already planned is decided.
-  const next = nextSchoolDay(setup, now, loggedDates);
-  const v = next ? dayVerdict(setup, rows, next) : null;
-  const dayWord = next ? (next === addDays(now, 1) ? "Homme" : cap(WD_ON[weekdayOf(next)])) : "";
-  const today = missableOn(setup, now);
-  const todayLessons = today.reduce((s, b) => s + b.count, 0);
-  const todayV = todayLessons && !loggedDates.has(now) ? dayVerdict(setup, rows, now) : null;
+  // Which day the lesson list is about.
+  const todayHasLessons = missableOn(setup, now).length > 0;
+  const focus = todayHasLessons && new Date().getHours() < SCHOOL_DAY_OVER ? now : nextSchoolDay(setup, now);
+  const dayWord = !focus ? "" : focus === now ? "Täna" : focus === addDays(now, 1) ? "Homme" : cap(WD_ON[weekdayOf(focus)]);
+  const focusBlocks = focus ? lessonsOn(setup, focus) : [];
+  const focusEntry = focus ? absences.find((a) => a.date === focus) : undefined;
+  // Verdict on what is still open that day: lessons already logged are spent.
+  const open = focusBlocks.filter((b) => !b.selfStudy && !focusEntry?.lessons[b.subjectId]);
+  const partial = !!focusEntry && open.length > 0;
+  const v = !focus || (focusEntry && !open.length) ? null : partial ? restVerdict() : dayVerdict(setup, rows, focus);
+  function restVerdict() {
+    const blockers: string[] = [];
+    let tightest: { subjectId: string; leftAfter: number } | null = null;
+    const per: Record<string, number> = {};
+    for (const b of open) per[b.subjectId] = (per[b.subjectId] ?? 0) + b.count;
+    for (const [id, k] of Object.entries(per)) {
+      const r = row(id);
+      if (!r || r.subject.advisory) continue;
+      const leftAfter = r.left - k;
+      if (r.left >= 0 && leftAfter < 0) blockers.push(id);
+      if (!tightest || leftAfter < tightest.leftAfter) tightest = { subjectId: id, leftAfter };
+    }
+    return { date: focus!, lessons: open.reduce((x, b) => x + b.count, 0), blockers, tightest };
+  }
 
+  const graded = rows.filter((r) => !r.subject.advisory);
+  const over = graded.filter((r) => r.left < 0);
   const groups: { id: string; title: string; rows: SubjectRow[] }[] = [
     { id: "edge", title: "Piiril", rows: graded.filter((r) => r.left <= 0) },
     { id: "warn", title: "Jälgi", rows: graded.filter((r) => r.status === "warn") },
     { id: "calm", title: "Rahulik", rows: graded.filter((r) => r.status === "ok") },
     { id: "soft", title: "Vähem tähtis", rows: rows.filter((r) => r.subject.advisory) },
   ].filter((g) => g.rows.length);
-  const calmCollapsible = graded.some((r) => r.left <= 2) && graded.filter((r) => r.status === "ok").length > 3;
+  const calmCollapsible = graded.some((r) => r.left <= 2) && graded.filter((r) => r.status === "ok").length > 4;
+
+  const schoolDaysLeft =
+    now > setup.windowEnd
+      ? 0
+      : eachDay(now > setup.windowStart ? now : setup.windowStart, setup.windowEnd).filter((d) => {
+          const w = new Date(d + "T12:00").getDay();
+          return w >= 1 && w <= 5 && !setup.holidays.includes(d);
+        }).length;
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="gap-4">
-        {v ? (
-          <div className="flex flex-col gap-1.5">
-            <h2 className={`m-0 font-bold text-[clamp(28px,7.5vw,38px)] leading-[1.05] tracking-[-0.025em] ${v.blockers.length ? "text-bad" : ""}`}>
-              {dayWord} {v.blockers.length ? "parem mitte." : "võid puududa."}
+    <div className="flex flex-col gap-7">
+      {/* Verdict */}
+      <Card className="gap-2">
+        {!focus ? (
+          <h2 className="m-0 text-[28px] leading-[34px] font-bold">Selle perioodi koolipäevad on läbi.</h2>
+        ) : v ? (
+          <>
+            <h2 className={`m-0 text-[28px] leading-[34px] font-bold ${v.blockers.length ? "text-bad" : ""}`}>
+              {partial
+                ? v.blockers.length
+                  ? "Ülejäänud tunde parem mitte."
+                  : "Ülejäänud tunde võid ka puududa."
+                : `${dayWord} ${v.blockers.length ? "parem mitte." : "võid puududa."}`}
             </h2>
             <p className="m-0 text-[15px] text-muted num">
-              {fmtDate(next!)} · {tunde(v.lessons)}.{" "}
-              {v.blockers.length ? (
-                <span className="text-ink">Läheks üle piiri: {joinEt(v.blockers.map(name))}.</span>
-              ) : v.tightest ? (
-                v.tightest.leftAfter === 0 ? (
-                  `Pärast seda on ${name(v.tightest.subjectId)} piiril.`
-                ) : (
-                  `Pärast seda jääb kõige vähem varu: ${name(v.tightest.subjectId)}, ${tunde(v.tightest.leftAfter)}.`
-                )
-              ) : null}
+              {v.blockers.length
+                ? `${partial ? "Ülejäänud päev" : "Terve päev"} viiks üle piiri: ${joinEt(v.blockers.map(name))}.`
+                : v.tightest
+                  ? v.tightest.leftAfter === 0
+                    ? `Pärast seda on ${name(v.tightest.subjectId)} piiril.`
+                    : `Pärast seda jääb kõige vähem varu: ${name(v.tightest.subjectId)}, ${tunde(v.tightest.leftAfter)}.`
+                  : "Selles päevas pole arvestatavaid tunde."}
             </p>
-          </div>
+          </>
         ) : (
-          <h2 className="m-0 font-bold text-[clamp(26px,7vw,34px)] leading-[1.05] tracking-[-0.025em]">Selle poolaasta koolipäevad on läbi.</h2>
+          <>
+            <h2 className="m-0 text-[28px] leading-[34px] font-bold">{dayWord} on kirjas.</h2>
+            <p className="m-0 text-[15px] text-muted">Kõik selle päeva tunnid on märgitud. Muuda neid ajaloos.</p>
+          </>
         )}
-
         {over.length > 0 && (
-          <div className="rounded-xl px-3 py-2.5 bg-bad text-bad-ink text-[15px] flex flex-col gap-1">
-            <b>Üle piiri: {joinEt(over.map((r) => r.subject.name))}.</b>
-            <span>{setup.rule.consequence} Räägi aineõpetajaga, kuidas puudujääki tasa teha.</span>
-          </div>
-        )}
-
-        {edge.length > 0 && (
-          <div className="rounded-xl px-3 py-2.5 bg-bad-soft flex flex-col gap-1.5">
+          <div className="mt-2 rounded-[18px] bg-bad-soft px-4 py-3 flex gap-3 items-start">
+            <span className="text-bad mt-0.5">
+              <Icon name="alert" size={20} />
+            </span>
             <div className="text-[15px]">
-              <b className="text-bad">{joinEt(edge.map((r) => r.subject.name))}:</b> järgmine puudutud tund = {mh}.
+              <b className="text-bad">Üle piiri: {joinEt(over.map((r) => r.subject.name))}.</b> {setup.rule.consequence} Räägi aineõpetajaga, kuidas puudujääki tasa teha.
             </div>
-            <ul className="m-0 p-0 list-none flex flex-col gap-0.5 text-sm text-muted num">
-              {edge.map((r) => {
-                const d = nextLesson(setup, r.subject.id, now);
-                return (
-                  <li key={r.subject.id}>
-                    {r.subject.name}: {d ? `järgmine tund ${fmtDate(d)}` : "selles poolaastas rohkem tunde pole"}
-                  </li>
-                );
-              })}
-            </ul>
           </div>
         )}
+      </Card>
 
-        <div>
-          <div className="text-[13px] text-muted mb-1.5">
-            Terveid päevi võid veel vahele jätta{seg?.assumed ? " (kui tunniplaan jääb samaks)" : ""}
-          </div>
-          <div className="grid grid-cols-5 gap-1.5">
-            {([1, 2, 3, 4, 5] as Weekday[]).map((d) => {
-              const c = capacity[d];
-              const tone = c === null ? "border border-dashed border-line" : c === 0 ? "bg-bad-soft" : c === 1 ? "bg-warn-soft" : "bg-ok-soft";
-              const ink = c === null ? "text-muted" : c === 0 ? "text-bad" : c === 1 ? "text-warn" : "text-ok";
+      {/* The focus day's lessons, one by one */}
+      {focus && focusBlocks.length > 0 && (
+        <Section title={`${dayWord}, ${fmtDate(focus)}`} footer="Võid = selle tunni võid vahele jätta ja jääd piiri sisse. Paaristund võtab 2 tundi varu.">
+          {focusBlocks.map((b, i) => {
+            if (b.selfStudy)
               return (
-                <div key={d} className={`rounded-xl py-2 text-center flex flex-col gap-0.5 ${tone}`}>
-                  <b className={`num font-display leading-none ${c === null ? "text-[13px] leading-[26px]" : "text-[26px]"} ${ink}`}>
-                    {c === null ? (seg?.timetable[d]?.some((b) => b.selfStudy) ? "iseõpe" : "vaba") : c}
-                  </b>
-                  <span className="text-xs text-muted">{WD_SHORT[d]}</span>
-                </div>
+                <Row key={i} detail={<span className="text-[15px]">iseõpe</span>}>
+                  <div className="flex items-baseline gap-3 text-muted">
+                    <span className="num text-[15px] w-8">{b.slot}.</span>
+                    <span>{name(b.subjectId)}</span>
+                  </div>
+                </Row>
               );
-            })}
-          </div>
-        </div>
-
-        <div className="flex gap-2 flex-wrap">
-          {todayV && (
-            <Button variant={todayV.blockers.length ? "danger" : "primary"} className="flex-1 min-w-[9rem]" onClick={onSkipToday}>
-              Täna puudun
-            </Button>
+            const r = row(b.subjectId);
+            const done = !!focusEntry?.lessons[b.subjectId];
+            const after = r ? r.left - b.count : 0;
+            const ok = !r || after >= 0;
+            const nextIsMh = !!r && r.left >= 0 && after < 0;
+            return (
+              <div key={i} className="cell flex items-center gap-3 px-5 min-h-[60px]">
+                <span className="num text-[15px] text-muted w-8 shrink-0">{b.slot}.</span>
+                <div className="flex-1 min-w-0 py-2">
+                  <div className="truncate">{name(b.subjectId)}</div>
+                  <div className={`text-[13px] num ${done ? "text-muted" : ok ? "text-ok" : "text-bad"}`}>
+                    {done ? "Kirjas" : !r ? "Ei lähe arvesse" : ok ? (after === 0 ? "Võid · siis piiril" : `Võid · jääb ${tunde(after)}`) : nextIsMh ? `Ei · see tund = ${mh}` : "Ei · juba üle piiri"}
+                  </div>
+                </div>
+                {done ? (
+                  <span className="text-muted shrink-0">
+                    <Icon name="check" size={20} stroke={2.4} />
+                  </span>
+                ) : (
+                  <Button
+                    variant={ok ? "ghost" : "quiet"}
+                    className={`shrink-0 min-h-9 px-4 text-[15px] ${ok ? "" : "text-bad"}`}
+                    onClick={() => onLogLesson(focus, b.subjectId, b.count)}
+                    aria-label={`Puudun: ${name(b.subjectId)} ${b.slot}`}
+                  >
+                    Puudun
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+          {open.length > 0 && (
+            <Row onClick={() => onSkipDay(focus)}>
+              <span className={v && v.blockers.length ? "text-bad" : "text-accent"}>{partial ? "Puudun ülejäänud tundidest" : "Puudun terve päeva"}</span>
+            </Row>
           )}
-          <Button variant="ghost" className="flex-1 min-w-[9rem]" onClick={onLog}>
-            Vali muu päev
-          </Button>
-        </div>
-        {todayV && todayV.blockers.length > 0 && (
-          <div className="text-sm text-bad -mt-2">Täna puududes läheks üle piiri: {joinEt(todayV.blockers.map(name))}.</div>
-        )}
+        </Section>
+      )}
 
-        <div className="text-[13px] text-muted num border-t border-line pt-3">
-          {setup.windowName}: {schoolDaysLeft} koolipäeva veel · {limitPhrase(setup.rule)}
+      {/* Whole days per weekday */}
+      <Section title="Terveid päevi võid veel vahele jätta" footer={seg?.assumed ? "Eeldusel, et tunniplaan jääb samaks." : undefined}>
+        <div className="grid grid-cols-5 gap-1.5 p-3">
+          {([1, 2, 3, 4, 5] as Weekday[]).map((d) => {
+            const c = capacity[d];
+            const selfStudy = seg?.timetable[d]?.some((b) => b.selfStudy);
+            const tone = c === null ? "border border-dashed border-line text-muted" : c === 0 ? "bg-bad-soft text-bad" : c === 1 ? "bg-warn-soft text-warn" : "bg-surface-2";
+            return (
+              <div key={d} className={`rounded-[16px] py-2.5 text-center flex flex-col gap-0.5 ${tone}`}>
+                <b className={`num leading-none ${c === null ? "text-[13px] leading-[26px] font-medium" : "text-[26px] font-semibold"}`}>
+                  {c === null ? (selfStudy ? "iseõpe" : "vaba") : c}
+                </b>
+                <span className="text-[12px] text-muted">{WD_SHORT[d]}</span>
+              </div>
+            );
+          })}
         </div>
-      </Card>
+      </Section>
 
-      <Card className="gap-0">
-        <div className="flex items-baseline justify-between gap-3 mb-1">
-          <h2 className="text-xl font-bold m-0">Ained</h2>
-          <span className="text-xs text-muted text-right">% kogu poolaasta tundidest · joon = piir</span>
-        </div>
-        {groups.map((g) => {
-          const collapsed = g.id === "calm" && calmCollapsible && !showCalm;
-          return (
-            <div key={g.id} className="flex flex-col">
-              <h3 className="m-0 mt-4 mb-1 text-[13px] font-bold text-muted tracking-normal flex items-center gap-2">
-                {g.title}
-                <span className="num font-body font-normal">{g.rows.length}</span>
-              </h3>
-              {collapsed ? (
-                <Button variant="quiet" className="self-start -ml-2 text-sm" onClick={() => setShowCalm(true)} aria-expanded={false}>
-                  Näita {g.rows.length} rahulikku ainet
-                </Button>
-              ) : (
-                g.rows.map((r, i) => <Row key={r.subject.id} r={r} first={i === 0} setup={setup} segId={seg?.id} limitPct={limitPct} />)
-              )}
-            </div>
-          );
-        })}
-      </Card>
+      {/* Subjects */}
+      {groups.map((g) => {
+        const collapsed = g.id === "calm" && calmCollapsible && !showCalm;
+        const list = collapsed ? g.rows.slice(0, 3) : g.rows;
+        return (
+          <Section key={g.id} title={g.id === "edge" ? <span className="text-bad">{g.title}</span> : g.title}>
+            {list.map((r) => (
+              <SubjectRowView key={r.subject.id} r={r} setup={setup} now={now} limitPct={limitPct} mh={mh} />
+            ))}
+            {collapsed && (
+              <Row onClick={() => setShowCalm(true)}>
+                <span className="text-accent">Näita kõiki {g.rows.length}</span>
+              </Row>
+            )}
+          </Section>
+        );
+      })}
+
+      <div className="px-5 -mt-3 flex flex-col gap-3 text-[13px] text-muted num">
+        <span>
+          {setup.windowName}: {schoolDaysLeft} koolipäeva veel · {limitPhrase(setup.rule)}. % on kogu perioodi tundidest, joon on piir.
+        </span>
+        <Button variant="ghost" onClick={onLog} className="self-start">
+          Kontrolli muud päeva
+        </Button>
+      </div>
     </div>
   );
 }
 
-function Row({ r, first, setup, segId, limitPct }: { r: SubjectRow; first: boolean; setup: Setup; segId?: string; limitPct: number }) {
+function blockSizes(setup: Setup, subjectId: string, now: string) {
+  const seg = planningSegment(setup, now);
+  const sizes = new Set<number>();
+  for (const day of Object.values(seg?.timetable ?? {})) for (const b of day) if (b.subjectId === subjectId && !b.selfStudy) sizes.add(b.count);
+  return [...sizes];
+}
+
+function SubjectRowView({ r, setup, now, limitPct, mh }: { r: SubjectRow; setup: Setup; now: string; limitPct: number; mh: string }) {
   let hint = r.subject.note ?? "";
-  const sizes = blockSizes(setup, segId, r.subject.id);
-  if (r.left > 0 && sizes.length && Math.min(...sizes) > r.left) hint = `${hint} Kõik tunnid on paaristunnid, ühtegi tervet tundi enam vahele jätta ei saa.`.trim();
-  else if (r.left > 1 && r.left <= 5 && sizes.length === 1 && sizes[0] === 2) hint = `${hint} See on ${Math.floor(r.left / 2)} paaristundi.`.trim();
+  const atEdge = r.left === 0 && !r.subject.advisory;
+  if (atEdge) {
+    const d = nextLesson(setup, r.subject.id, now);
+    hint = d ? `Järgmine tund ${fmtDate(d)} = ${mh}.` : "Selles perioodis rohkem tunde pole.";
+  } else {
+    const sizes = blockSizes(setup, r.subject.id, now);
+    if (r.left > 0 && sizes.length && Math.min(...sizes) > r.left) hint = `${hint} Kõik tunnid on paaristunnid, tervet tundi enam vahele jätta ei saa.`.trim();
+    else if (r.left > 1 && r.left <= 5 && sizes.length === 1 && sizes[0] === 2) hint = `${hint} See on ${Math.floor(r.left / 2)} paaristundi.`.trim();
+  }
   return (
-    <div className={`grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 py-3 ${first ? "" : "border-t border-line"} ${r.subject.advisory ? "opacity-80" : ""}`}>
-      <div className="min-w-0">
-        <div className="font-bold">{r.subject.name}</div>
-        <div className="num text-sm text-muted">
-          {r.absent} / {r.total} puudutud · {pct(r.pct)}
-          {r.planned > 0 && ` · ${r.planned} plaanis`}
-        </div>
+    <div className="cell px-5 py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="truncate">{r.subject.name}</span>
+        <Pill status={r.status}>{leftLabel(r.left)}</Pill>
       </div>
-      <Pill status={r.status}>{leftLabel(r.left)}</Pill>
-      <div className="col-span-2">
-        <Meter
-          pct={r.pct}
-          planPct={r.total ? r.planned / r.total : 0}
-          limitPct={limitPct}
-          status={r.status}
-          label={`${r.subject.name}: ${pct(r.pct)} puudutud, piir ${fmtLimit(setup.rule.limit)}`}
-        />
+      <div className="text-[13px] text-muted num mt-0.5">
+        {r.absent}/{r.total} puudutud · {pct(r.pct)}
+        {r.planned > 0 && ` · ${r.planned} plaanis`}
       </div>
-      {hint && <div className="col-span-2 text-[13px] text-muted">{hint}</div>}
+      <Meter
+        pct={r.pct}
+        planPct={r.total ? r.planned / r.total : 0}
+        limitPct={limitPct}
+        status={r.status}
+        label={`${r.subject.name}: ${pct(r.pct)} puudutud, piir ${fmtLimit(setup.rule.limit)}`}
+      />
+      {hint && <div className={`text-[13px] mt-1.5 ${atEdge ? "text-bad" : "text-muted"}`}>{hint}</div>}
     </div>
   );
 }

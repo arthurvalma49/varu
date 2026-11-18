@@ -11,14 +11,14 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icon.svg"],
-      workbox: { globPatterns: ["**/*.{js,css,html,svg,png}", "**/*latin*.woff2"] },
+      workbox: { globPatterns: ["**/*.{js,css,html,svg,png}"] },
       manifest: {
         name: "Varu – puudumiste arvestus",
         short_name: "Varu",
         description: "Kui palju tunde võid veel puududa, enne kui aine läheb üle kooli piiri.",
         lang: "et",
-        theme_color: "#14161c",
-        background_color: "#14161c",
+        theme_color: "#f2f2f7",
+        background_color: "#f2f2f7",
         display: "standalone",
         start_url: ".",
         icons: [

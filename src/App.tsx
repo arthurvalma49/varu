@@ -10,15 +10,15 @@ import { Onboarding } from "./ui/Onboarding";
 import { Overview } from "./ui/Overview";
 import { Settings } from "./ui/Settings";
 import { ShareCard } from "./ui/ShareCard";
-import { fmtDate, tunde } from "./ui/kit";
+import { Button, LargeTitle, cap, fmtDate, fmtLong, tunde } from "./ui/kit";
 
 type Tab = "overview" | "log" | "history" | "settings";
-const TITLES: Record<Tab, string> = { overview: "Varu", log: "Lisa puudumine", history: "Ajalugu", settings: "Seaded" };
+const TITLES: Record<Tab, string> = { overview: "Täna", log: "Lisa puudumine", history: "Ajalugu", settings: "Seaded" };
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: "overview", label: "Ülevaade", icon: "M4 19V9m6 10V5m6 14v-7m4 7H2" },
-  { id: "log", label: "Lisa", icon: "M12 5v14M5 12h14" },
-  { id: "history", label: "Ajalugu", icon: "M12 7v5l3 2M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9Z" },
-  { id: "settings", label: "Seaded", icon: "M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4" },
+  { id: "overview", label: "Täna", icon: "M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm3 8h2m4 0h2m-8 4h2" },
+  { id: "log", label: "Lisa", icon: "M12 8v8M8 12h8M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
+  { id: "history", label: "Ajalugu", icon: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
+  { id: "settings", label: "Seaded", icon: "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4" },
 ];
 
 function readHashSetup(): Setup | null {
@@ -43,28 +43,52 @@ export default function App() {
 
   const go = (t: Tab) => {
     setTab(t);
+    setToast(null);
     window.scrollTo({ top: 0 });
   };
+  const name = (id: string) => data.setup?.subjects.find((s) => s.id === id)?.name ?? id;
   const lessonsIn = (a: Absence) => Object.values(a.lessons).reduce((s, n) => s + n, 0);
   const logged = (a: Absence) => {
     addAbsences([a]);
     go("overview");
     setToast({
-      text: `${a.date > now ? "Plaanis" : "Kirjas"}: ${fmtDate(a.date)}, ${tunde(lessonsIn(a))}.`,
+      text: `${a.date > now ? "Plaanis" : "Kirjas"}: ${fmtDate(a.date)}, ${tunde(lessonsIn(a))}`,
       undo: () => removeAbsence(a.id),
       key: Date.now(),
     });
   };
+  /** One lesson from the Täna list: merged into that day's entry so history stays one row per day. */
+  const logLesson = (date: string, subjectId: string, count: number) => {
+    const existing = data.absences.find((a) => a.date === date);
+    const text = `${name(subjectId)} ${date > now ? "plaanis" : "kirjas"}, ${tunde(count)}`;
+    if (existing) {
+      const prev = { ...existing.lessons };
+      updateAbsence(existing.id, { ...prev, [subjectId]: (prev[subjectId] ?? 0) + count });
+      setToast({ text, undo: () => updateAbsence(existing.id, prev), key: Date.now() });
+    } else {
+      const a: Absence = { id: newId(), date, lessons: { [subjectId]: count }, createdAt: new Date().toISOString() };
+      addAbsences([a]);
+      setToast({ text, undo: () => removeAbsence(a.id), key: Date.now() });
+    }
+  };
   const removed = (id: string) => {
     const a = data.absences.find((x) => x.id === id);
     removeAbsence(id);
-    if (a) setToast({ text: `Kustutatud: ${fmtDate(a.date)}.`, undo: () => addAbsences([a]), key: Date.now() });
+    if (a) setToast({ text: `Kustutatud: ${fmtDate(a.date)}`, undo: () => addAbsences([a]), key: Date.now() });
   };
-  const skipToday = () => {
+  /** Whole day, or the rest of it when some lessons are already logged (merged into that day's entry). */
+  const skipDay = (date: string) => {
     if (!data.setup) return;
-    const lessons: Record<string, number> = {};
-    for (const b of missableOn(data.setup, now)) lessons[b.subjectId] = (lessons[b.subjectId] ?? 0) + b.count;
-    logged({ id: newId(), date: now, lessons, createdAt: new Date().toISOString() });
+    const existing = data.absences.find((a) => a.date === date);
+    const rest: Record<string, number> = {};
+    for (const b of missableOn(data.setup, date)) if (!existing?.lessons[b.subjectId]) rest[b.subjectId] = (rest[b.subjectId] ?? 0) + b.count;
+    if (!Object.keys(rest).length) return;
+    if (existing) {
+      const prev = { ...existing.lessons };
+      updateAbsence(existing.id, { ...prev, ...rest });
+      const n = Object.values(rest).reduce((x, y) => x + y, 0);
+      setToast({ text: `Ülejäänud ${tunde(n)} kirjas`, undo: () => updateAbsence(existing.id, prev), key: Date.now() });
+    } else logged({ id: newId(), date, lessons: rest, createdAt: new Date().toISOString() });
   };
 
   const clearHash = () => history.replaceState(null, "", location.pathname + location.search);
@@ -74,29 +98,13 @@ export default function App() {
     if (!incoming && location.hash.startsWith("#setup=")) clearHash();
   }, [incoming]);
 
-  const loggedDates = useMemo(() => new Set(data.absences.map((a) => a.date)), [data.absences]);
   const rows = useMemo(() => (data.setup ? summary(data.setup, data.absences, now) : []), [data, now]);
 
-  const header = data.setup && (
-    <header className="px-1 flex items-end justify-between gap-3">
-      <div className="min-w-0">
-        <div className="text-[13px] text-muted truncate">
-          {data.setup.schoolName}
-          {data.setup.className ? ` · ${data.setup.className}` : ""} · {data.setup.windowName}
-        </div>
-        <h1 className="text-[28px] font-bold leading-tight m-0">{TITLES[tab]}</h1>
-      </div>
-    </header>
-  );
-
-  return (
-    <div className="min-h-dvh">
-      <main className="max-w-[720px] mx-auto px-4 pt-5 pb-28 flex flex-col gap-4">
-        {store.saveError && (
-          <div className="rounded-xl px-3 py-2.5 bg-bad-soft text-sm">Ei saa selles brauseris salvestada (nt privaatne aken). Muudatused kaovad.</div>
-        )}
-
-        {!data.setup ? (
+  if (!data.setup)
+    return (
+      <div className="min-h-dvh">
+        <main className="max-w-[640px] mx-auto px-4 pb-10 pt-[env(safe-area-inset-top)]">
+          {store.saveError && <SaveError />}
           <Onboarding
             incoming={incoming}
             today={now}
@@ -109,68 +117,77 @@ export default function App() {
               go("overview");
             }}
           />
-        ) : (
-          <>
-            {header}
-            {incoming && (
-              <div className="rounded-2xl border border-accent bg-accent-soft p-3 flex flex-col gap-2 fade-in">
-                <div className="text-sm">
-                  Avasid jagamislingi: <b>{incoming.schoolName} {incoming.className}</b>, {incoming.windowName}. Asendan sinu seadistuse? Puudumised jäävad alles.
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="min-h-11 px-4 rounded-xl bg-accent text-accent-ink font-bold cursor-pointer"
-                    onClick={() => {
-                      replaceAll({ ...data, setup: incoming });
-                      setIncoming(null);
-                      clearHash();
-                    }}
-                  >
-                    Asenda
-                  </button>
-                  <button
-                    type="button"
-                    className="min-h-11 px-4 rounded-xl border border-line font-bold cursor-pointer"
-                    onClick={() => {
-                      setIncoming(null);
-                      clearHash();
-                    }}
-                  >
-                    Ei
-                  </button>
-                </div>
-              </div>
-            )}
-            {tab === "overview" && fresh && <ShareCard setup={data.setup} onClose={() => setFresh(false)} />}
-            {tab === "overview" && (
-              <Overview
-                setup={data.setup}
-                rows={rows}
-                now={now}
-                loggedDates={loggedDates}
-                onLog={() => go("log")}
-                onSkipToday={skipToday}
-              />
-            )}
-            {tab === "log" && <LogAbsence setup={data.setup} rows={rows} now={now} onSave={logged} />}
-            {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onUpdate={updateAbsence} onImport={addAbsences} />}
-            {tab === "settings" && <Settings store={store} />}
-          </>
+        </main>
+      </div>
+    );
+
+  const sub =
+    tab === "overview"
+      ? `${cap(fmtLong(now))}${data.setup.className ? ` · ${data.setup.className}` : ""}`
+      : tab === "settings"
+        ? undefined
+        : `${data.setup.schoolName}${data.setup.className ? ` · ${data.setup.className}` : ""}`;
+
+  return (
+    <div className="min-h-dvh">
+      <main className="max-w-[640px] mx-auto px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-32 flex flex-col gap-7">
+        {store.saveError && <SaveError />}
+        {tab !== "settings" && <div className="-mx-4 -mb-3"><LargeTitle title={TITLES[tab]} subtitle={sub} /></div>}
+        {incoming && (
+          <div className="rounded-[26px] bg-surface p-5 flex flex-col gap-3 fade-in">
+            <div className="text-[15px]">
+              Avasid jagamislingi: <b>{incoming.schoolName} {incoming.className}</b>, {incoming.windowName}. Asendan sinu seadistuse? Puudumised jäävad alles.
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  replaceAll({ ...data, setup: incoming });
+                  setIncoming(null);
+                  clearHash();
+                }}
+              >
+                Asenda
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIncoming(null);
+                  clearHash();
+                }}
+              >
+                Ei
+              </Button>
+            </div>
+          </div>
         )}
+        {tab === "overview" && fresh && <ShareCard setup={data.setup} onClose={() => setFresh(false)} />}
+        {tab === "overview" && (
+          <Overview
+            setup={data.setup}
+            rows={rows}
+            absences={data.absences}
+            now={now}
+            onLog={() => go("log")}
+            onSkipDay={skipDay}
+            onLogLesson={logLesson}
+          />
+        )}
+        {tab === "log" && <LogAbsence setup={data.setup} rows={rows} now={now} onSave={logged} />}
+        {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onUpdate={updateAbsence} onImport={addAbsences} />}
+        {tab === "settings" && <Settings store={store} />}
       </main>
 
       {toast && (
         <div
           key={toast.key}
           role="status"
-          className="toast-in fixed z-20 inset-x-4 bottom-[calc(57px+env(safe-area-inset-bottom)+12px)] max-w-[688px] mx-auto rounded-2xl bg-ink text-bg pl-4 pr-1.5 py-1.5 flex items-center gap-3 shadow-[0_10px_30px_-10px_oklch(0_0_0/0.5)]"
+          className="toast-in fixed z-20 inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+82px)] max-w-[420px] mx-auto rounded-full bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-5 pr-1.5 py-1.5 flex items-center gap-3 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
         >
-          <span className="flex-1 min-w-0 text-[15px] num">{toast.text}</span>
+          <span className="flex-1 min-w-0 text-[15px] num truncate">{toast.text}</span>
           {toast.undo && (
             <button
               type="button"
-              className="min-h-11 px-3 rounded-xl font-bold text-[15px] cursor-pointer hover:bg-bg/10"
+              className="min-h-10 px-4 rounded-full font-semibold text-[15px] text-[#0a84ff] cursor-pointer active:opacity-60"
               onClick={() => {
                 toast.undo!();
                 setToast(null);
@@ -182,27 +199,33 @@ export default function App() {
         </div>
       )}
 
-      {data.setup && (
-        <nav className="fixed bottom-0 inset-x-0 bg-surface/90 backdrop-blur border-t border-line safe-bottom" aria-label="Põhimenüü">
-          <div className="max-w-[720px] mx-auto grid grid-cols-4">
-            {TABS.map((t) => (
+      <nav className="fixed z-10 inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+10px)] px-5 pointer-events-none" aria-label="Põhimenüü">
+        <div className="glass pointer-events-auto max-w-[420px] mx-auto rounded-full p-1 grid grid-cols-4">
+          {TABS.map((t) => {
+            const on = tab === t.id;
+            return (
               <button
                 key={t.id}
                 type="button"
-                aria-current={tab === t.id ? "page" : undefined}
+                aria-current={on ? "page" : undefined}
                 onClick={() => go(t.id)}
-                className={`relative flex flex-col items-center gap-0.5 pt-2 pb-2 min-h-14 cursor-pointer ${tab === t.id ? "text-accent" : "text-muted hover:text-ink"}`}
+                className={`flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full cursor-pointer transition-colors duration-200 ${
+                  on ? "bg-surface-2 text-accent" : "text-ink"
+                }`}
               >
-                {tab === t.id && <span className="absolute top-0 inset-x-6 h-[3px] rounded-b-full bg-accent" aria-hidden />}
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d={t.icon} />
                 </svg>
-                <span className={`text-xs ${tab === t.id ? "font-bold" : ""}`}>{t.label}</span>
+                <span className={`text-[10px] leading-none ${on ? "font-semibold" : "font-medium"}`}>{t.label}</span>
               </button>
-            ))}
-          </div>
-        </nav>
-      )}
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
+}
+
+function SaveError() {
+  return <div className="rounded-xl px-4 py-3 bg-bad-soft text-[15px] my-3">Ei saa selles brauseris salvestada (nt privaatne aken). Muudatused kaovad.</div>;
 }

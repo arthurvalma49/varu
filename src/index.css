@@ -1,86 +1,123 @@
 @import "tailwindcss";
 
 /* Dark first (most students use it), light via system setting. OKLCH tokens, greys tinted toward the blue accent. */
+/*
+ * iOS system palette. Token names stay semantic (ink, muted, accent, ok/warn/bad) so components
+ * read the same in both themes. Status *text* uses Apple's higher-contrast variants; fills use
+ * the standard system colours.
+ */
 :root {
-  --bg: oklch(0.19 0.012 265);
-  --surface: oklch(0.235 0.014 265);
-  --surface-2: oklch(0.275 0.016 265);
-  --line: oklch(1 0 0 / 0.09);
-  --ink: oklch(0.95 0.008 265);
-  --muted: oklch(0.72 0.02 265);
-  --accent: oklch(0.72 0.15 268);
-  --accent-ink: oklch(0.18 0.02 268);
-  --accent-soft: oklch(0.72 0.15 268 / 0.16);
-  --ok: oklch(0.78 0.14 158);
-  --ok-soft: oklch(0.78 0.14 158 / 0.14);
-  --warn: oklch(0.82 0.14 80);
-  --warn-soft: oklch(0.82 0.14 80 / 0.15);
-  --bad: oklch(0.7 0.19 22);
-  --bad-soft: oklch(0.7 0.19 22 / 0.16);
-  --bad-ink: oklch(0.17 0.03 22);
+  --bg: #f2f2f7; /* systemGroupedBackground */
+  --surface: #ffffff; /* secondarySystemGroupedBackground */
+  --surface-2: rgb(118 118 128 / 0.12); /* tertiarySystemFill */
+  --raised: #ffffff; /* segmented control thumb */
+  --line: rgb(60 60 67 / 0.29); /* separator */
+  --ink: #000000;
+  --muted: rgb(60 60 67 / 0.64);
+  --faint: rgb(60 60 67 / 0.3);
+  --accent: #0071e3;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(0 122 255 / 0.12);
+  --ok: #248a3d;
+  --ok-soft: rgb(52 199 89 / 0.15);
+  --ok-fill: #34c759;
+  --warn: #b25000;
+  --warn-soft: rgb(255 149 0 / 0.15);
+  --warn-fill: #ff9500;
+  --bad: #d70015;
+  --bad-soft: rgb(255 59 48 / 0.12);
+  --bad-fill: #ff3b30;
+  --bad-ink: #ffffff;
+  --bar: rgb(249 249 249 / 0.86);
+  --glass: rgb(255 255 255 / 0.72);
+  --glass-edge: rgb(255 255 255 / 0.9);
+  --glass-rim: rgb(0 0 0 / 0.06);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-2: rgb(118 118 128 / 0.24);
+    --raised: #636366;
+    --line: rgb(84 84 88 / 0.65);
+    --ink: #ffffff;
+    --muted: rgb(235 235 245 / 0.62);
+    --faint: rgb(235 235 245 / 0.3);
+    --accent: #0a84ff;
+    --accent-ink: #ffffff;
+    --accent-soft: rgb(10 132 255 / 0.2);
+    --ok: #30d158;
+    --ok-soft: rgb(48 209 88 / 0.18);
+    --ok-fill: #30d158;
+    --warn: #ffb340;
+    --warn-soft: rgb(255 159 10 / 0.18);
+    --warn-fill: #ff9f0a;
+    --bad: #ff6961;
+    --bad-soft: rgb(255 69 58 / 0.2);
+    --bad-fill: #ff453a;
+    --bad-ink: #ffffff;
+    --bar: rgb(22 22 23 / 0.86);
+    --glass: rgb(44 44 46 / 0.7);
+    --glass-edge: rgb(255 255 255 / 0.14);
+    --glass-rim: rgb(255 255 255 / 0.06);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-2: rgb(118 118 128 / 0.24);
+  --raised: #636366;
+  --line: rgb(84 84 88 / 0.65);
+  --ink: #ffffff;
+  --muted: rgb(235 235 245 / 0.62);
+  --faint: rgb(235 235 245 / 0.3);
+  --accent: #0a84ff;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(10 132 255 / 0.2);
+  --ok: #30d158;
+  --ok-soft: rgb(48 209 88 / 0.18);
+  --ok-fill: #30d158;
+  --warn: #ffb340;
+  --warn-soft: rgb(255 159 10 / 0.18);
+  --warn-fill: #ff9f0a;
+  --bad: #ff6961;
+  --bad-soft: rgb(255 69 58 / 0.2);
+  --bad-fill: #ff453a;
+  --bad-ink: #ffffff;
+  --bar: rgb(22 22 23 / 0.86);
+  --glass: rgb(44 44 46 / 0.7);
+  --glass-edge: rgb(255 255 255 / 0.14);
+  --glass-rim: rgb(255 255 255 / 0.06);
   color-scheme: dark;
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg: oklch(0.975 0.004 265);
-    --surface: oklch(1 0 0);
-    --surface-2: oklch(0.955 0.006 265);
-    --line: oklch(0 0 0 / 0.1);
-    --ink: oklch(0.22 0.02 265);
-    --muted: oklch(0.5 0.02 265);
-    --accent: oklch(0.52 0.19 268);
-    --accent-ink: oklch(1 0 0);
-    --accent-soft: oklch(0.52 0.19 268 / 0.1);
-    --ok: oklch(0.52 0.13 158);
-    --ok-soft: oklch(0.52 0.13 158 / 0.12);
-    --warn: oklch(0.58 0.13 70);
-    --warn-soft: oklch(0.7 0.14 80 / 0.18);
-    --bad: oklch(0.55 0.2 25);
-    --bad-soft: oklch(0.55 0.2 25 / 0.11);
-    --bad-ink: oklch(1 0 0);
-    color-scheme: light;
-  }
-}
-
-:root[data-theme="light"] {
-    --bg: oklch(0.975 0.004 265);
-    --surface: oklch(1 0 0);
-    --surface-2: oklch(0.955 0.006 265);
-    --line: oklch(0 0 0 / 0.1);
-    --ink: oklch(0.22 0.02 265);
-    --muted: oklch(0.5 0.02 265);
-    --accent: oklch(0.52 0.19 268);
-    --accent-ink: oklch(1 0 0);
-    --accent-soft: oklch(0.52 0.19 268 / 0.1);
-    --ok: oklch(0.52 0.13 158);
-    --ok-soft: oklch(0.52 0.13 158 / 0.12);
-    --warn: oklch(0.58 0.13 70);
-    --warn-soft: oklch(0.7 0.14 80 / 0.18);
-    --bad: oklch(0.55 0.2 25);
-    --bad-soft: oklch(0.55 0.2 25 / 0.11);
-    --bad-ink: oklch(1 0 0);
-    color-scheme: light;
-  }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-raised: var(--raised);
   --color-line: var(--line);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
+  --color-ok-fill: var(--ok-fill);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
+  --color-warn-fill: var(--warn-fill);
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
+  --color-bad-fill: var(--bad-fill);
   --color-bad-ink: var(--bad-ink);
-  --font-display: "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+  --color-bar: var(--bar);
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 }
 
 /*
@@ -95,6 +132,9 @@ body {
   color: var(--ink);
   font-family: var(--font-body);
   -webkit-tap-highlight-color: transparent;
+  font-size: 17px;
+  line-height: 1.3;
+  -webkit-font-smoothing: antialiased;
 }
 body {
   min-height: 100dvh;
@@ -104,7 +144,6 @@ h2,
 h3 {
   font-family: var(--font-display);
   text-wrap: balance;
-  letter-spacing: -0.015em;
 }
 p {
   text-wrap: pretty;
@@ -131,13 +170,24 @@ button {
   font: inherit;
   color: inherit;
 }
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
+/* iOS zooms into any field under 16px when it is focused; keep every field at 16px or more. */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: none;
-  }
+/* No double-tap zoom when tapping controls quickly (steppers, Puudun). */
+button,
+a,
+label,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.6;
 }
 }
 
@@ -145,15 +195,49 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @layer components {
 .field {
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 10px;
   padding: 0 12px;
   min-height: 44px;
   width: 100%;
 }
 .field:focus {
-  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* A text input living inside a list cell: no chrome of its own. */
+.cell-input {
+  background: transparent;
+  border: 0;
+  min-height: 44px;
+  width: 100%;
   outline: none;
+}
+/* Inset grouped list cells with inset hairline separators, as in iOS. */
+.cell {
+  position: relative;
+}
+.cell + .cell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--sep-inset, 16px);
+  height: 0.5px;
+  background: var(--line);
+}
+.press:active {
+  background: var(--surface-2);
+}
+/* Liquid Glass stand-in for floating controls (tab bar, nav buttons): translucent, blurred, lit edge. */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 0.5px 0 var(--glass-edge),
+    0 0 0 0.5px var(--glass-rim),
+    0 10px 30px -8px rgb(0 0 0 / 0.18);
 }
 .field::placeholder {
   color: var(--muted);

@@ -10,21 +10,26 @@ export function ShareCard({ setup, onClose }: { setup: Setup; onClose: () => voi
   const lessons = Object.values(totals(setup)).reduce((s, n) => s + n, 0);
   const url = `${location.origin}${location.pathname}#setup=${encodeSetup(setup)}`;
   return (
-    <Card className="gap-2 border-accent/50 bg-accent-soft fade-in">
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="text-lg font-bold m-0">Valmis. Saada klassikaaslastele?</h2>
-        <button type="button" aria-label="Sulge" onClick={onClose} className="size-10 -mr-2 -mt-2 grid place-items-center rounded-lg text-muted hover:text-ink cursor-pointer">
-          <Icon name="x" size={18} />
+    <Card className="gap-3 fade-in">
+      <div className="flex items-start gap-3">
+        <span className="shrink-0 size-11 rounded-full bg-accent-soft text-accent grid place-items-center">
+          <Icon name="share" size={22} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <h2 className="m-0 text-[17px] font-semibold">Valmis. Saada klassikaaslastele?</h2>
+          <p className="m-0 mt-0.5 text-[15px] text-muted num">
+            {setup.subjects.length} ainet, {lessons} tundi perioodis, vaheajad arvestatud. Nemad saavad sama tunniplaani ühe puudutusega, sinu puudumisi link ei sisalda.
+          </p>
+        </div>
+        <button type="button" aria-label="Sulge" onClick={onClose} className="size-8 -mr-1 -mt-1 grid place-items-center rounded-full bg-surface-2 text-muted cursor-pointer">
+          <Icon name="x" size={16} stroke={2.4} />
         </button>
       </div>
-      <p className="m-0 text-sm text-muted num">
-        {setup.subjects.length} ainet, {lessons} tundi perioodis, vaheajad arvestatud. Link annab klassikaaslastele sama tunniplaani ühe puudutusega, sinu puudumisi see ei sisalda.
-      </p>
-      <div className="flex gap-2 flex-wrap items-center">
+      <div className="flex gap-3 items-center">
         <Button
           onClick={async () => {
             try {
-              if (navigator.share) await navigator.share({ title: "Varu", text: `${setup.schoolName} ${setup.className} tunniplaan Varus`, url });
+              if (navigator.share) await navigator.share({ title: "Tunniplaan", text: `${setup.schoolName} ${setup.className}`, url });
               else {
                 await navigator.clipboard.writeText(url);
                 setMsg("Link kopeeritud.");
@@ -36,7 +41,7 @@ export function ShareCard({ setup, onClose }: { setup: Setup; onClose: () => voi
         >
           Jaga linki
         </Button>
-        <span className="text-sm text-muted" role="status">
+        <span className="text-[15px] text-muted" role="status">
           {msg}
         </span>
       </div>
