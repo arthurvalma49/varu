@@ -2,22 +2,25 @@ import { useState } from "react";
 import { inWindow } from "../core/calc";
 import { parsePaste, toAbsences, type ParsedLine } from "../core/importer";
 import type { Absence, Setup } from "../core/types";
-import { Button, Card, Empty, fmtDate, tunde } from "./kit";
+import { Button, Card, Empty, Stepper, fmtDate, tunde } from "./kit";
 
 export function History({
   setup,
   absences,
   now,
   onRemove,
+  onUpdate,
   onImport,
 }: {
   setup: Setup;
   absences: Absence[];
   now: string;
   onRemove: (id: string) => void;
+  onUpdate: (id: string, lessons: Record<string, number>) => void;
   onImport: (a: Absence[]) => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; lessons: Record<string, number> } | null>(null);
   const name = (id: string) => setup.subjects.find((s) => s.id === id)?.name ?? id;
   const tracked = (id: string) => setup.subjects.find((s) => s.id === id)?.tracked ?? false;
   const list = [...absences].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
@@ -66,22 +69,59 @@ export function History({
                   {plan && counts && <span className="text-xs font-body font-bold text-accent border border-dashed border-accent/60 rounded-full px-2 py-0.5">plaan</span>}
                   {!counts && <span className="text-xs font-body font-normal text-muted">ei lähe arvesse</span>}
                 </div>
-                <Button variant="quiet" className="px-2 text-sm font-normal row-start-1 col-start-2" onClick={() => onRemove(e.id)} aria-label={`Kustuta ${fmtDate(e.date)}`}>
-                  Kustuta
-                </Button>
-                <div className="min-w-0 col-span-2">
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(e.lessons).map(([id, n]) => (
-                      <span
-                        key={id}
-                        className={`text-[13px] px-2 py-0.5 rounded-full ${counts && tracked(id) && !plan ? "bg-accent-soft" : "border border-dashed border-line text-muted"}`}
-                      >
-                        {name(id)} ×{n}
-                      </span>
+                {editing?.id === e.id ? (
+                  <div className="col-span-2 flex flex-col gap-1 fade-in">
+                    {Object.keys(e.lessons).map((id) => (
+                      <div key={id} className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate">{name(id)}</span>
+                        <Stepper
+                          label={name(id)}
+                          max={12}
+                          value={editing.lessons[id] ?? 0}
+                          onChange={(n) => setEditing({ ...editing, lessons: { ...editing.lessons, [id]: n } })}
+                        />
+                      </div>
                     ))}
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        onClick={() => {
+                          if (Object.values(editing.lessons).some((n) => n > 0)) onUpdate(e.id, editing.lessons);
+                          else onRemove(e.id);
+                          setEditing(null);
+                        }}
+                      >
+                        Salvesta
+                      </Button>
+                      <Button variant="ghost" onClick={() => setEditing(null)}>
+                        Loobu
+                      </Button>
+                    </div>
                   </div>
-                  {e.note && <div className="text-sm text-muted mt-1">{e.note}</div>}
-                </div>
+                ) : (
+                  <>
+                    <div className="flex row-start-1 col-start-2 -mr-2">
+                      <Button variant="quiet" className="px-2 text-sm font-normal" onClick={() => setEditing({ id: e.id, lessons: { ...e.lessons } })} aria-label={`Muuda ${fmtDate(e.date)}`}>
+                        Muuda
+                      </Button>
+                      <Button variant="quiet" className="px-2 text-sm font-normal" onClick={() => onRemove(e.id)} aria-label={`Kustuta ${fmtDate(e.date)}`}>
+                        Kustuta
+                      </Button>
+                    </div>
+                    <div className="min-w-0 col-span-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(e.lessons).map(([id, n]) => (
+                          <span
+                            key={id}
+                            className={`text-[13px] px-2 py-0.5 rounded-full ${counts && tracked(id) && !plan ? "bg-accent-soft" : "border border-dashed border-line text-muted"}`}
+                          >
+                            {name(id)} ×{n}
+                          </span>
+                        ))}
+                      </div>
+                      {e.note && <div className="text-sm text-muted mt-1">{e.note}</div>}
+                    </div>
+                  </>
+                )}
               </div>
             );
           })

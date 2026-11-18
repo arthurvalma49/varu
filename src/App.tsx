@@ -9,6 +9,7 @@ import { LogAbsence } from "./ui/LogAbsence";
 import { Onboarding } from "./ui/Onboarding";
 import { Overview } from "./ui/Overview";
 import { Settings } from "./ui/Settings";
+import { ShareCard } from "./ui/ShareCard";
 import { fmtDate, tunde } from "./ui/kit";
 
 type Tab = "overview" | "log" | "history" | "settings";
@@ -27,7 +28,8 @@ function readHashSetup(): Setup | null {
 
 export default function App() {
   const store = useAppData();
-  const { data, setSetup, addAbsences, removeAbsence, replaceAll } = store;
+  const { data, setSetup, addAbsences, removeAbsence, updateAbsence, replaceAll } = store;
+  const [fresh, setFresh] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [incoming, setIncoming] = useState<Setup | null>(readHashSetup);
   const [toast, setToast] = useState<{ text: string; undo?: () => void; key: number } | null>(null);
@@ -97,11 +99,14 @@ export default function App() {
         {!data.setup ? (
           <Onboarding
             incoming={incoming}
-            onDone={(s) => {
+            today={now}
+            onDone={(s, absences, isFresh) => {
               setSetup(s);
+              if (absences?.length) addAbsences(absences);
               setIncoming(null);
               clearHash();
-              setTab(s.subjects.length ? "overview" : "settings");
+              setFresh(!!isFresh);
+              go("overview");
             }}
           />
         ) : (
@@ -137,6 +142,7 @@ export default function App() {
                 </div>
               </div>
             )}
+            {tab === "overview" && fresh && <ShareCard setup={data.setup} onClose={() => setFresh(false)} />}
             {tab === "overview" && (
               <Overview
                 setup={data.setup}
@@ -148,7 +154,7 @@ export default function App() {
               />
             )}
             {tab === "log" && <LogAbsence setup={data.setup} rows={rows} now={now} onSave={logged} />}
-            {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onImport={addAbsences} />}
+            {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onUpdate={updateAbsence} onImport={addAbsences} />}
             {tab === "settings" && <Settings store={store} />}
           </>
         )}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { dayCapacity, dayVerdict, maxAllowed, nextLesson, nextSchoolDay, planningSegment, preview, statusOf, summary, totals } from "./calc";
 import { parsePaste, toAbsences } from "./importer";
 import { decodeSetup, encodeSetup } from "./share";
+import { appendLesson, breakDays, buildSetup, cycleLesson, defaultWindow, removeLesson, startingAbsence } from "./setup";
 import { migrateSetup, ram9bTemplate } from "./templates";
 import type { Rule } from "./types";
 
@@ -135,5 +136,58 @@ describe("paste import", () => {
     ]);
     expect(lines.find((l) => l.raw === "foo bar")!.ok).toBe(false);
     expect(toAbsences(ok)).toHaveLength(5);
+  });
+});
+
+describe("guided setup", () => {
+  it("tapping the same subject twice makes a paaristund and slots renumber", () => {
+    let day = appendLesson([], "matemaatika");
+    day = appendLesson(day, "matemaatika");
+    day = appendLesson(day, "fuusika");
+    expect(day.map((l) => [l.subjectId, l.count, l.slot])).toEqual([
+      ["matemaatika", 2, "1–2"],
+      ["fuusika", 1, "3"],
+    ]);
+    day = cycleLesson(day, 1); // x1 -> x2
+    expect(day[1]).toMatchObject({ count: 2, slot: "3–4" });
+    day = cycleLesson(day, 1); // x2 -> iseõpe
+    expect(day[1]).toMatchObject({ count: 1, selfStudy: true });
+    expect(removeLesson(day, 0)[0].slot).toBe("1");
+  });
+
+  it("national breaks become holidays, weekdays only", () => {
+    const d = breakDays("2026-09-01", "2027-01-25");
+    expect(d).toContain("2026-10-26");
+    expect(d).not.toContain("2026-10-31"); // Saturday
+    expect(d).toContain("2027-01-01");
+    expect(d.length).toBe(5 + 10);
+  });
+
+  it("default window follows the school year", () => {
+    expect(defaultWindow("2026-11-18", "x")).toEqual({ name: "I poolaasta 2026/27", start: "2026-09-01", end: "2027-01-25" });
+    expect(defaultWindow("2027-03-01", "x").name).toBe("II poolaasta 2026/27");
+  });
+
+  it("builds a working setup: only used subjects, breaks excluded, starting absences", () => {
+    const tt = { 1: appendLesson(appendLesson([], "matemaatika"), "matemaatika"), 2: [], 3: appendLesson([], "keemia"), 4: [], 5: [] };
+    const setup = buildSetup({
+      schoolId: "oru",
+      schoolName: "",
+      className: "8.a",
+      window: { name: "I poolaasta", start: "2026-09-01", end: "2027-01-25" },
+      subjectNames: ["Matemaatika", "Keemia", "Kunst"],
+      timetable: tt,
+      timetableFrom: "2026-09-01",
+      baseline: {},
+    });
+    expect(setup.subjects.map((s) => s.id)).toEqual(["matemaatika", "keemia"]);
+    expect(setup.rule.limit).toEqual({ num: 18, den: 100 });
+    const T = totals(setup);
+    // 21 Mondays in the window, minus 3 in breaks (26.10, 21.12, 28.12) = 18, x2 lessons
+    expect(T["matemaatika"]).toBe(36);
+    const a = startingAbsence(setup, { matemaatika: 4, keemia: 0 }, "")!;
+    expect(a.lessons).toEqual({ matemaatika: 4 });
+    expect(summary(setup, [a], "2026-11-18").find((r) => r.subject.id === "matemaatika")!.absent).toBe(4);
+    expect(startingAbsence(setup, { keemia: 0 }, "")).toBeNull();
   });
 });

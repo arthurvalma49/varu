@@ -4,9 +4,11 @@ import { isValidISO } from "../core/dates";
 import { SCHOOLS } from "../core/schools";
 import { decodeSetup, encodeSetup, validateData } from "../core/share";
 import { emptyTimetable, slug } from "../core/templates";
-import type { AppData, Lesson, Setup, Weekday } from "../core/types";
+import type { AppData, Setup } from "../core/types";
 import type { Store } from "../store";
-import { Button, Label, WD_LONG, fmtDate, fmtLimit } from "./kit";
+import { breakDays } from "../core/setup";
+import { Button, Icon, Label, dateRuns, fmtDate, fmtLimit } from "./kit";
+import { WeekEditor } from "./WeekEditor";
 
 function Section({ title, sub, children, open = false }: { title: string; sub?: string; children: ReactNode; open?: boolean }) {
   return (
@@ -17,7 +19,7 @@ function Section({ title, sub, children, open = false }: { title: string; sub?: 
           {sub && <div className="text-sm text-muted truncate">{sub}</div>}
         </div>
         <span className="text-muted transition-transform duration-150 group-open:rotate-90" aria-hidden>
-          ›
+          <Icon name="right" />
         </span>
       </summary>
       <div className="px-4 pb-4 flex flex-col gap-3">{children}</div>
@@ -284,24 +286,40 @@ export function Settings({ store }: { store: Store }) {
         </Button>
       </Section>
 
-      <Section title="Vabad päevad" sub={setup.holidays.length ? `${setup.holidays.length} päeva` : "Pühad, koolivälised päevad"}>
-        <div className="text-[13px] text-muted">Päevad perioodi sees, kus tunde ei toimu. Need vähendavad tundide koguarvu.</div>
-        <AddHoliday onAdd={(d) => updateSetup((s) => void (!s.holidays.includes(d) && (s.holidays.push(d), s.holidays.sort())))} />
-        <div className="flex flex-wrap gap-1.5">
-          {setup.holidays.map((h) => (
-            <span key={h} className="inline-flex items-center gap-1 pl-3 pr-1 py-1 rounded-full bg-surface-2 text-sm num">
-              {fmtDate(h, true)}
+      <Section title="Vabad päevad" sub={setup.holidays.length ? `${setup.holidays.length} koolipäeva ilma tundideta` : "Vaheajad, pühad, koolivälised päevad"}>
+        <div className="text-[13px] text-muted">Päevad, kus tunde ei toimu. Need vähendavad tundide koguarvu, seega ka lubatud puudumisi.</div>
+        {(() => {
+          const missing = breakDays(setup.windowStart, setup.windowEnd).filter((d) => !setup.holidays.includes(d));
+          return missing.length > 0 ? (
+            <div>
+              <Button
+                variant="ghost"
+                onClick={() => updateSetup((s) => void (s.holidays = [...new Set([...s.holidays, ...missing])].sort()))}
+              >
+                Lisa riiklikud vaheajad ({missing.length} päeva)
+              </Button>
+            </div>
+          ) : null;
+        })()}
+        <div className="flex flex-col">
+          {dateRuns(setup.holidays).map((r) => (
+            <div key={r.start} className="flex items-center justify-between gap-3 min-h-11 border-t border-line first:border-t-0">
+              <span className="num text-[15px]">
+                {r.start === r.end ? fmtDate(r.start, true) : `${fmtDate(r.start)} – ${fmtDate(r.end, true)}`}
+                <span className="text-muted text-sm"> · {r.days.length} p</span>
+              </span>
               <button
                 type="button"
-                aria-label="Eemalda"
-                className="text-muted hover:text-ink px-2 cursor-pointer"
-                onClick={() => updateSetup((s) => void (s.holidays = s.holidays.filter((x) => x !== h)))}
+                aria-label={`Eemalda ${fmtDate(r.start)}${r.start === r.end ? "" : ` – ${fmtDate(r.end)}`}`}
+                className="size-10 grid place-items-center rounded-lg text-muted hover:text-bad cursor-pointer"
+                onClick={() => updateSetup((s) => void (s.holidays = s.holidays.filter((x) => !r.days.includes(x))))}
               >
-                ✕
+                <Icon name="x" size={18} />
               </button>
-            </span>
+            </div>
           ))}
         </div>
+        <AddHoliday onAdd={(d) => updateSetup((s) => void (!s.holidays.includes(d) && (s.holidays.push(d), s.holidays.sort())))} />
       </Section>
 
       <Section title="Jaga klassikaaslastega" sub="Saada tunniplaan ja reegel, ilma sinu puudumisteta">
@@ -375,8 +393,8 @@ function AddSubject({ onAdd }: { onAdd: (name: string) => void }) {
       }}
     >
       <input className="field min-w-0" placeholder="Uus aine" aria-label="Uue aine nimi" value={v} onChange={(e) => setV(e.target.value)} />
-      <Button type="submit" variant="ghost" disabled={!v.trim()}>
-        + Lisa
+      <Button type="submit" variant="ghost" className="shrink-0" disabled={!v.trim()}>
+        Lisa
       </Button>
     </form>
   );
@@ -387,8 +405,8 @@ function AddHoliday({ onAdd }: { onAdd: (d: string) => void }) {
   return (
     <div className="flex gap-2">
       <input type="date" aria-label="Vaba päev" className="field num min-w-0" value={v} onChange={(e) => setV(e.target.value)} />
-      <Button variant="ghost" disabled={!isValidISO(v)} onClick={() => (onAdd(v), setV(""))}>
-        + Lisa
+      <Button variant="ghost" className="shrink-0" disabled={!isValidISO(v)} onClick={() => (onAdd(v), setV(""))}>
+        Lisa
       </Button>
     </div>
   );
@@ -417,10 +435,8 @@ function ResetAll({ onReset }: { onReset: () => void }) {
 
 function SegmentEditor({ setup, si, updateSetup }: { setup: Setup; si: number; updateSetup: Store["updateSetup"] }) {
   const seg = setup.segments[si];
-  const [day, setDay] = useState<Weekday>(1);
   const others = setup.segments.filter((_, i) => i !== si);
   const upd = (fn: (s: Setup["segments"][number]) => void) => updateSetup((d) => fn(d.segments[si]));
-  const lessons = seg.timetable[day];
 
   return (
     <div className="rounded-xl border border-line p-3 flex flex-col gap-3 bg-surface-2/50">
@@ -459,99 +475,11 @@ function SegmentEditor({ setup, si, updateSetup }: { setup: Setup; si: number; u
         )}
       </div>
 
-      <div className="grid grid-cols-5 gap-1" role="tablist" aria-label="Nädalapäev">
-        {([1, 2, 3, 4, 5] as Weekday[]).map((d) => {
-          const n = seg.timetable[d].reduce((x, l) => x + l.count, 0);
-          return (
-            <button
-              key={d}
-              role="tab"
-              aria-selected={day === d}
-              type="button"
-              onClick={() => setDay(d)}
-              className={`rounded-lg py-1.5 cursor-pointer text-sm ${day === d ? "bg-accent text-accent-ink font-bold" : "bg-surface hover:bg-surface-2"}`}
-            >
-              {WD_LONG[d].slice(0, 2).replace(/^./, (c) => c.toUpperCase())}
-              <span className="block num text-xs opacity-75">{n}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        {lessons.length === 0 && <div className="text-sm text-muted">Sel päeval tunde pole.</div>}
-        {lessons.map((l, li) => (
-          <LessonRow
-            key={li}
-            setup={setup}
-            lesson={l}
-            onChange={(fn) => upd((s) => fn(s.timetable[day][li]))}
-            onRemove={() => upd((s) => void s.timetable[day].splice(li, 1))}
-          />
-        ))}
-        <Button
-          variant="ghost"
-          disabled={!setup.subjects.length}
-          onClick={() =>
-            upd((s) => {
-              const prev = s.timetable[day];
-              const lastSlot = Number(String(prev[prev.length - 1]?.slot ?? "0").split("–").pop()) || 0;
-              prev.push({ subjectId: setup.subjects[0].id, count: 1, slot: String(lastSlot + 1) });
-            })
-          }
-        >
-          + Lisa tund ({WD_LONG[day]})
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function LessonRow({
-  setup,
-  lesson,
-  onChange,
-  onRemove,
-}: {
-  setup: Setup;
-  lesson: Lesson;
-  onChange: (fn: (l: Lesson) => void) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="grid grid-cols-[52px_1fr_64px_auto] gap-1.5 items-center">
-      <input aria-label="Tunni number" className="field num px-2 text-center" value={lesson.slot} onChange={(e) => onChange((l) => void (l.slot = e.target.value))} />
-      <select aria-label="Aine" className="field min-w-0 px-2" value={lesson.subjectId} onChange={(e) => onChange((l) => void (l.subjectId = e.target.value))}>
-        {setup.subjects.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="Tunde"
-        className="field num px-2"
-        value={lesson.selfStudy ? "s" : String(lesson.count)}
-        onChange={(e) =>
-          onChange((l) => {
-            if (e.target.value === "s") {
-              l.selfStudy = true;
-              l.count = 1;
-            } else {
-              delete l.selfStudy;
-              l.count = Number(e.target.value);
-            }
-          })
-        }
-      >
-        <option value="1">×1</option>
-        <option value="2">×2</option>
-        <option value="3">×3</option>
-        <option value="s">iseõpe</option>
-      </select>
-      <button type="button" aria-label="Eemalda tund" className="text-muted hover:text-bad min-h-11 px-2 cursor-pointer" onClick={onRemove}>
-        ✕
-      </button>
+      <WeekEditor
+        subjects={setup.subjects}
+        timetable={seg.timetable}
+        onChange={(t) => upd((s) => void (s.timetable = t))}
+      />
     </div>
   );
 }

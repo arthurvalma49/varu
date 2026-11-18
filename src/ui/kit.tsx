@@ -36,6 +36,8 @@ const ICONS = {
   right: "m9 18 6-6-6-6",
   x: "M18 6 6 18M6 6l12 12",
   plus: "M12 5v14M5 12h14",
+  minus: "M5 12h14",
+  check: "m5 12 5 5L20 7",
 } as const;
 export function Icon({ name, size = 20 }: { name: keyof typeof ICONS; size?: number }) {
   return (
@@ -117,4 +119,58 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
       {children && <div className="text-muted text-sm max-w-[42ch]">{children}</div>}
     </div>
   );
+}
+
+/** − n + control for small counts (lessons). */
+export function Stepper({ value, onChange, label, max = 99 }: { value: number; onChange: (n: number) => void; label: string; max?: number }) {
+  const btn = "size-11 grid place-items-center rounded-xl border border-line cursor-pointer hover:bg-surface-2 disabled:opacity-35 disabled:cursor-not-allowed";
+  return (
+    <div className="flex items-center gap-1" role="group" aria-label={label}>
+      <button type="button" className={btn} aria-label={`${label}: vähem`} disabled={value <= 0} onClick={() => onChange(Math.max(0, value - 1))}>
+        <Icon name="minus" size={18} />
+      </button>
+      <span className={`num font-display font-bold text-lg w-8 text-center ${value ? "" : "text-muted"}`} aria-live="polite">
+        {value}
+      </span>
+      <button type="button" className={btn} aria-label={`${label}: rohkem`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
+        <Icon name="plus" size={18} />
+      </button>
+    </div>
+  );
+}
+
+/** Toggleable chip for picking from a set. */
+export function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className={`min-h-11 pl-3 pr-3.5 rounded-full border text-[15px] cursor-pointer inline-flex items-center gap-1.5 transition-colors duration-100 ${
+        on ? "bg-accent-soft border-accent/50 text-ink font-bold" : "border-line text-muted hover:text-ink hover:bg-surface-2"
+      }`}
+    >
+      {on ? <Icon name="check" size={16} /> : <Icon name="plus" size={16} />}
+      {children}
+    </button>
+  );
+}
+
+/** Group sorted ISO dates into consecutive weekday runs for display ("26.–30. okt"). */
+export function dateRuns(dates: string[]): { start: string; end: string; days: string[] }[] {
+  const out: { start: string; end: string; days: string[] }[] = [];
+  for (const d of [...dates].sort()) {
+    const last = out[out.length - 1];
+    if (last) {
+      const gap = (new Date(d + "T12:00").getTime() - new Date(last.end + "T12:00").getTime()) / 864e5;
+      const wd = new Date(d + "T12:00").getDay();
+      if (gap === 1 || (gap === 3 && wd === 1)) {
+        last.end = d;
+        last.days.push(d);
+        continue;
+      }
+    }
+    out.push({ start: d, end: d, days: [d] });
+  }
+  return out;
 }

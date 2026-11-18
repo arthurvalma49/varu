@@ -129,7 +129,9 @@ export function Overview({
               const ink = c === null ? "text-muted" : c === 0 ? "text-bad" : c === 1 ? "text-warn" : "text-ok";
               return (
                 <div key={d} className={`rounded-xl py-2 text-center flex flex-col gap-0.5 ${tone}`}>
-                  <b className={`num font-display leading-none ${c === null ? "text-[13px] leading-[26px]" : "text-[26px]"} ${ink}`}>{c === null ? "iseõpe" : c}</b>
+                  <b className={`num font-display leading-none ${c === null ? "text-[13px] leading-[26px]" : "text-[26px]"} ${ink}`}>
+                    {c === null ? (seg?.timetable[d]?.some((b) => b.selfStudy) ? "iseõpe" : "vaba") : c}
+                  </b>
                   <span className="text-xs text-muted">{WD_SHORT[d]}</span>
                 </div>
               );

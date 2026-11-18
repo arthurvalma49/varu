@@ -21,29 +21,29 @@ The friend's original was a single HTML page ("Puudumiste arvestus 9.b"), hardco
 - Kunst and tööõpetus excluded; muusika graded only at year end; klassijuhataja tund not graded.
 All of this is now the `ram9bTemplate()` in `src/core/templates.ts`. Tests confirm Varu gives the same totals and limits for all 14 subjects.
 
-## Current state (v0.1.0)
+## Current state (18 Nov 2026)
+
+Live at https://varu-amber.vercel.app (Vercel project `varu`, GitHub `arthurvalma49/varu`, private). Pushing to `main` deploys to production. Vercel rejects commits whose author email is not on the GitHub account, so the repo uses the GitHub noreply address.
 
 Done and working:
-- React 18 + Vite 5 + TypeScript + Tailwind 4.1 + vite-plugin-pwa. Estonian UI, dark-first theme.
-- `src/core/` pure TS logic (no DOM, meant to be reused in a native app): date-based lesson counting from timetable segments, holidays, baseline counts, integer-math limits (fractions, "gte" vs "gt" mode), day capacity, what-if preview, paste parser, share codes.
-- Screens: onboarding (RAM 9.b template or blank with school preset), Ülevaade (overview), Lisa (log + preview), Ajalugu (history + paste import), Seaded (rule, window, subjects, timetable editor per period, holidays, share link/code, JSON backup, reset).
-- Data in localStorage (`varu:v1`), per device. Share link: `#setup=<base64url>` carries the setup only, never absences.
-- 9 vitest tests pass, `npm run build` passes, checked at 390px in dark and light.
-- Live demo (Claude artifact, private): https://claude.ai/artifact/3aQno99kCeXiH8EXewvcyz. Share links don't work inside the artifact viewer (it strips `#key=value` hashes); copying the code does.
+- React 18 + Vite 5 + TypeScript + Tailwind 4.1 + vite-plugin-pwa. Estonian UI, dark-first with a light theme. Copy tone: "can I skip?", an honest friend for students' own use.
+- `src/core/` pure TS: date-based lesson counting, integer-math limits, four-level status (ok, warn, edge = 0 left, over), planned absences (entries dated after today count once the day passes), day verdicts ("can I skip the next school day?"), guided setup builder (`setup.ts`) with national 2026/27 school breaks, paste parser, share codes.
+- Guided setup: school and class, tap subjects, build each weekday by tapping subjects in order, starting absences. The draft survives a reload. Classmates can paste a share code or open a link instead.
+- Overview: verdict sentence for the next free school day, every subject at 0 named with its next lesson date, one-tap "Täna puudun", grouped subject list, advisory subjects ("Vähem tähtis") never headline.
+- Lisa: Täna/Homme chips, a sticky verdict and save bar, a red action when saving goes over the limit. Ajalugu: edit, and delete with undo. Seaded: the same tap-to-build timetable editor, holidays shown as ranges plus a one-tap national-breaks button.
+- 20 vitest tests. `npm test` and `npm run build` pass.
 
-Known gaps / not yet tested:
-- Paste importer has only been tested on made-up input, never a real Stuudium/eKool copy.
-- RAM rule wording unverified; only the RAM 9.b template exists.
-- No deploy yet (target: Vercel). Service worker only works once it's on real hosting.
-- 7 school presets in `src/core/schools.ts` (research table in README). Their rules change yearly.
-- Not done yet: i18n (ru/en), reminders, native app.
+Known gaps:
+- The paste importer has never been tested on a real Stuudium/eKool copy.
+- The RAM rule wording is unverified. Private schools may have different breaks than the national calendar.
+- Not done: reminders the evening before, i18n, native app.
 
 ## Suggested next steps
 
-1. Push to a GitHub repo and deploy to Vercel; check PWA install and offline on iPhone.
-2. Get a real Stuudium absences copy from Arthur, add it as a test fixture, tune `importer.ts`.
-3. Verify RAM hindamisjuhend p 3.1; let other RAM classes enter their timetable and share it.
-4. Native: Expo app reusing `src/core`, or Capacitor around the PWA as a quick first step.
+1. Get a real Stuudium absences copy from Arthur, add it as a test fixture, tune `importer.ts`.
+2. Verify RAM hindamisjuhend p 3.1.
+3. Evening-before warning (web push for installed PWAs on iOS 16.4+).
+4. Native: Expo app reusing `src/core`, or Capacitor around the PWA.
 
 ## Conventions
 

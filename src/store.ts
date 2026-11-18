@@ -56,9 +56,22 @@ export function useAppData() {
     (id: string) => setData((d) => ({ ...d, absences: d.absences.filter((a) => a.id !== id) })),
     [],
   );
+  const updateAbsence = useCallback(
+    (id: string, lessons: Record<string, number>) =>
+      setData((d) => {
+        const clean = Object.fromEntries(Object.entries(lessons).filter(([, n]) => n > 0));
+        return {
+          ...d,
+          absences: Object.keys(clean).length
+            ? d.absences.map((a) => (a.id === id ? { ...a, lessons: clean } : a))
+            : d.absences.filter((a) => a.id !== id),
+        };
+      }),
+    [],
+  );
   const replaceAll = useCallback((next: AppData) => setData(next), []);
 
-  return { data, saveError, setSetup, updateSetup, addAbsences, removeAbsence, replaceAll };
+  return { data, saveError, setSetup, updateSetup, addAbsences, removeAbsence, updateAbsence, replaceAll };
 }
 
 export type Store = ReturnType<typeof useAppData>;
