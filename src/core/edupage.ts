@@ -9,7 +9,7 @@ import type { ISODate, Lesson, Segment, Timetable, Weekday } from "./types";
 
 export interface EduData {
   schoolName: string;
-  periods: { id: string; period: string; short?: string }[];
+  periods: { id: string; period: string; short?: string; starttime?: string; endtime?: string }[];
   classes: { id: string; name: string }[];
   subjects: { id: string; name: string }[];
   groups: { id: string; name: string; classid: string; entireclass: boolean }[];
@@ -203,3 +203,10 @@ const shift = (ds: ISODate, k: number) => {
 };
 const dayBefore = (ds: ISODate) => shift(ds, -1);
 const dayAfter = (ds: ISODate) => shift(ds, 1);
+
+/** Bell times by lesson number, when the timetable publishes them. */
+export function eduPeriodTimes(d: EduData): Record<string, { start: string; end: string }> | undefined {
+  const out: Record<string, { start: string; end: string }> = {};
+  for (const p of d.periods) if (p.starttime && p.endtime && /^\d{1,2}:\d{2}$/.test(p.starttime)) out[String(Number.parseInt(p.period, 10))] = { start: p.starttime.padStart(5, "0"), end: p.endtime.padStart(5, "0") };
+  return Object.keys(out).length ? out : undefined;
+}

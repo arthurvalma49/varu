@@ -178,6 +178,7 @@ export function Onboarding({
                   segments: segments.length ? segments : undefined,
                   currentSegId: current?.id,
                   baseline: {},
+                  periodTimes: r.periodTimes,
                 },
               });
               window.scrollTo({ top: 0 });
@@ -186,7 +187,7 @@ export function Onboarding({
           <Section footer="Kui kool EduPage'i ei kasuta või import ei õnnestu.">
             <Row
               onClick={() => {
-                setState((v) => ({ step: "subjects", draft: { ...v.draft, source: "manual", segments: undefined, currentSegId: undefined } }));
+                setState((v) => ({ step: "subjects", draft: { ...v.draft, source: "manual", segments: undefined, currentSegId: undefined, periodTimes: undefined } }));
                 window.scrollTo({ top: 0 });
               }}
               chevron

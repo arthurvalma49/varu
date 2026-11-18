@@ -1,13 +1,28 @@
 import { useMemo, useState } from "react";
-import { inWindow, lessonsOn, preview, segmentFor, statusOf } from "../core/calc";
-import { addDays, weekdayOf } from "../core/dates";
+import { inWindow, lessonTimes, lessonsOn, missableOn, preview, segmentFor, statusOf } from "../core/calc";
+import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow } from "../core/types";
 import { newId } from "../store";
-import { Button, Check, Icon, Pill, Row, Section, Segmented, WD_LONG, cap, fmtDate, joinEt, leftLabel, pct, tunde } from "./kit";
+import { Button, Check, Icon, Pill, Row, Section, Segmented, Switch, WD_LONG, cap, fmtDate, joinEt, leftLabel, pct, tunde } from "./kit";
 
 type DayPick = "today" | "tomorrow" | "other";
 
-export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: SubjectRow[]; now: string; onSave: (a: Absence) => void }) {
+/** Longest range "Mitu päeva" accepts (a long trip is still one screen). */
+const MAX_RANGE_DAYS = 31;
+
+export function LogAbsence({
+  setup,
+  rows,
+  now,
+  onSave,
+  onSaveMany,
+}: {
+  setup: Setup;
+  rows: SubjectRow[];
+  now: string;
+  onSave: (a: Absence) => void;
+  onSaveMany: (a: Absence[]) => void;
+}) {
   const tomorrow = addDays(now, 1);
   const [date, setDate] = useState(now);
   const [pick, setPick] = useState<DayPick>("today");
@@ -15,6 +30,8 @@ export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: S
   const [extra, setExtra] = useState<Record<string, number>>({});
   const [extraOpen, setExtraOpen] = useState(false);
   const [note, setNote] = useState("");
+  const [multi, setMulti] = useState(false);
+  const [until, setUntil] = useState(addDays(now, 4));
 
   const name = (id: string) => setup.subjects.find((s) => s.id === id)?.name ?? id;
   const blocks = lessonsOn(setup, date);
@@ -38,7 +55,25 @@ export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: S
     return s;
   }, [blocks, unchecked, extra]);
 
-  const p = preview(setup, rows, date, sel);
+  // Several days: every missable lesson of each school day in the range, one entry per day.
+  const rangeDays = useMemo(() => {
+    if (!multi || until < date) return [];
+    return eachDay(date, until)
+      .slice(0, MAX_RANGE_DAYS)
+      .map((d) => {
+        const lessons: Record<string, number> = {};
+        for (const b of missableOn(setup, d)) lessons[b.subjectId] = (lessons[b.subjectId] ?? 0) + b.count;
+        return { date: d, lessons };
+      })
+      .filter((x) => Object.keys(x.lessons).length);
+  }, [multi, date, until, setup]);
+  const rangeSel = useMemo(() => {
+    const s: Record<string, number> = {};
+    for (const d of rangeDays) for (const [id, n] of Object.entries(d.lessons)) s[id] = (s[id] ?? 0) + n;
+    return s;
+  }, [rangeDays]);
+
+  const p = preview(setup, rows, date, multi ? rangeSel : sel);
   const noTimetable = inWindow(setup, date) && wd >= 1 && wd <= 5 && !setup.holidays.includes(date) && !seg;
 
   let info = "";
@@ -53,6 +88,12 @@ export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: S
 
   const save = () => {
     if (!p.total) return;
+    if (multi) {
+      const createdAt = new Date().toISOString();
+      onSaveMany(rangeDays.map((d) => ({ id: newId(), date: d.date, lessons: d.lessons, note: note.trim() || undefined, createdAt })));
+      setNote("");
+      return;
+    }
     onSave({ id: newId(), date, lessons: sel, note: note.trim() || undefined, createdAt: new Date().toISOString() });
     setUnchecked(new Set());
     setExtra({});
@@ -61,17 +102,21 @@ export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: S
 
   const goesOver = p.counts && p.over.length > 0;
   const verdict = !p.total
-    ? "Vali tunnid"
+    ? multi
+      ? "Neil päevadel tunde pole"
+      : "Vali tunnid"
     : !p.counts
       ? `${tunde(p.total)}, ei lähe arvesse`
       : goesOver
         ? `Läheks üle piiri: ${joinEt(p.over.map(name))}`
-        : `${tunde(p.total)}, jääd piiri sisse`;
+        : multi
+          ? `${rangeDays.length} päeva, ${tunde(p.total)}, jääd piiri sisse`
+          : `${tunde(p.total)}, jääd piiri sisse`;
   const action = future ? "Planeeri" : "Salvesta";
 
   return (
     <>
-      <Section footer={info || undefined}>
+      <Section footer={(!multi && info) || undefined}>
         <div className="p-3">
           <Segmented<DayPick>
             label="Päev"
@@ -89,7 +134,7 @@ export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: S
           />
         </div>
         <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>{cap(WD_LONG[wd])}</span>
+          <span>{multi ? "Alates" : cap(WD_LONG[wd])}</span>
           <input
             type="date"
             aria-label="Kuupäev"
@@ -98,12 +143,44 @@ export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: S
             onChange={(e) => {
               setPick(e.target.value === now ? "today" : e.target.value === tomorrow ? "tomorrow" : "other");
               changeDate(e.target.value);
+              if (e.target.value > until) setUntil(e.target.value);
             }}
           />
         </label>
+        {multi && (
+          <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
+            <span>Kuni</span>
+            <input
+              type="date"
+              aria-label="Kuni"
+              min={date}
+              className="num bg-surface-2 rounded-full px-3 py-1.5 text-[17px] border-0 text-accent"
+              value={until}
+              onChange={(e) => e.target.value && setUntil(e.target.value)}
+            />
+          </label>
+        )}
+        <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
+          <span>Mitu päeva</span>
+          <Switch label="Mitu päeva" checked={multi} onChange={setMulti} />
+        </div>
       </Section>
 
-      {(blocks.length > 0 || noTimetable || extraOpen || Object.keys(extra).length > 0) && (
+      {multi && (
+        <Section title={rangeDays.length ? `${rangeDays.length} koolipäeva` : undefined} footer={rangeDays.length ? "Iga päev läheb eraldi kirja, kõik selle päeva tunnid. Üksikuid tunde saad hiljem ajaloos muuta." : "Valitud vahemikus pole tunde. Vali teised kuupäevad."}>
+          {rangeDays.map((d) => {
+            const n = Object.values(d.lessons).reduce((x, y) => x + y, 0);
+            return (
+              <Row key={d.date} detail={<span className="num text-[15px]">{tunde(n)}</span>}>
+                <div className="num">{fmtDate(d.date)}</div>
+                <div className="text-[13px] text-muted truncate">{Object.keys(d.lessons).map(name).join(", ")}</div>
+              </Row>
+            );
+          })}
+        </Section>
+      )}
+
+      {!multi && (blocks.length > 0 || noTimetable || extraOpen || Object.keys(extra).length > 0) && (
         <Section title={`Tunnid, ${fmtDate(date)}`}>
           {blocks.map((b, i) =>
             b.selfStudy ? (
@@ -126,7 +203,7 @@ export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: S
                 }}
                 className="cell press flex items-center gap-3 px-5 min-h-[52px] w-full text-left cursor-pointer"
               >
-                <span className="num text-[15px] text-muted w-8 shrink-0">{b.slot}.</span>
+                <span className="num text-[15px] text-muted w-12 shrink-0">{lessonTimes(setup, b)?.start ?? `${b.slot}.`}</span>
                 <span className="flex-1 min-w-0 truncate">{name(b.subjectId)}</span>
                 <span className="num text-[15px] text-muted">{tunde(b.count)}</span>
                 <Check on={!unchecked.has(i)} />

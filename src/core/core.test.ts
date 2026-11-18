@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayCapacity, dayVerdict, maxAllowed, nextLesson, nextSchoolDay, planningSegment, preview, statusOf, summary, totals } from "./calc";
+import { dayCapacity, dayClock, lessonTimes, dayVerdict, maxAllowed, nextLesson, nextSchoolDay, planningSegment, preview, statusOf, summary, totals } from "./calc";
 import { parsePaste, toAbsences } from "./importer";
 import { decodeSetup, encodeSetup } from "./share";
 import { appendLesson, breakDays, buildSetup, cycleLesson, defaultWindow, removeLesson, startingAbsence } from "./setup";
@@ -263,5 +263,22 @@ describe("EduPage import (real public data: Rocca al Mare Kool 9.b, I and II per
     // Within a few lessons of the original tool's hand count (school events are not in timetables).
     expect(T["fuusika"]).toBe(34);
     expect(Math.abs(T["matemaatika"] - 85)).toBeLessThanOrEqual(4);
+  });
+});
+
+describe("lesson times", () => {
+  const setup = ram9bTemplate();
+  it("maps slots to RAM bell times, double lessons span both", () => {
+    const wed = setup.segments[0].timetable[3];
+    expect(lessonTimes(setup, wed[0])).toEqual({ start: "09:00", end: "10:30" }); // Geograafia 1–2
+    expect(lessonTimes(setup, wed[3])).toEqual({ start: "14:30", end: "15:10" }); // Muusika 7
+  });
+  it("knows the current and next lesson and when the day is over", () => {
+    const at = (h: number, m: number) => dayClock(setup, "2026-11-18", h * 60 + m);
+    expect(at(8, 30)).toEqual({ current: null, next: 0, over: false });
+    expect(at(9, 15)).toEqual({ current: 0, next: 1, over: false });
+    expect(at(10, 35)).toEqual({ current: null, next: 1, over: false }); // break before Füüsika
+    expect(at(15, 30)).toMatchObject({ current: null, next: null, over: true });
+    expect(dayClock({ ...setup, periodTimes: undefined }, "2026-11-18", 600)).toBeNull();
   });
 });

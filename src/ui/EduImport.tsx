@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { eduDivisions, eduTimetable, edupageSchool, pickedGroupNames, ttRange, type EduData, type EduPeriod, type EduResult, type EduTimetableInfo } from "../core/edupage";
+import { eduDivisions, eduPeriodTimes, eduTimetable, edupageSchool, pickedGroupNames, ttRange, type EduData, type EduPeriod, type EduResult, type EduTimetableInfo } from "../core/edupage";
 import { Button, Check, Row, Section } from "./kit";
 
 export interface EduImportResult extends EduResult {
@@ -9,6 +9,8 @@ export interface EduImportResult extends EduResult {
   groupNames: string[];
   /** Every timetable the school published this school year (the chosen one included). */
   periods: EduPeriod[];
+  /** Bell times by lesson number, when published. */
+  periodTimes?: Record<string, { start: string; end: string }>;
 }
 
 type Phase =
@@ -152,7 +154,7 @@ export function EduImport({
       }
     }
     setFinishing(false);
-    onResult({ ...result, schoolName: ready.data.schoolName, className, groupNames: pickedGroupNames(ready.data, picks), periods });
+    onResult({ ...result, schoolName: ready.data.schoolName, className, groupNames: pickedGroupNames(ready.data, picks), periods, periodTimes: eduPeriodTimes(ready.data) });
   };
 
   return (

@@ -34,6 +34,18 @@ export default function App() {
   const [incoming, setIncoming] = useState<Setup | null>(readHashSetup);
   const [toast, setToast] = useState<{ text: string; undo?: () => void; key: number } | null>(null);
   const now = today();
+  // Keep "Praegu / Järgmine" and the day roll-over current: re-render every 30 s and on return.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setTick((x) => x + 1);
+    const t = setInterval(bump, 30000);
+    const vis = () => document.visibilityState === "visible" && bump();
+    document.addEventListener("visibilitychange", vis);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", vis);
+    };
+  }, []);
   // iOS: the large title collapses into a compact bar once it scrolls away.
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -65,10 +77,23 @@ export default function App() {
       key: Date.now(),
     });
   };
+  /** Several days at once (Lisa: Mitu päeva): one entry per day, one undo for all. */
+  const loggedMany = (list: Absence[]) => {
+    if (!list.length) return;
+    addAbsences(list);
+    go("overview");
+    const n = list.reduce((s, a) => s + lessonsIn(a), 0);
+    const plan = list[0].date > now;
+    setToast({
+      text: `${plan ? "Plaanis" : "Kirjas"}: ${list.length} päeva, ${tunde(n)}`,
+      undo: () => list.forEach((a) => removeAbsence(a.id)),
+      key: Date.now(),
+    });
+  };
   /** One lesson from the Täna list: merged into that day's entry so history stays one row per day. */
   const logLesson = (date: string, subjectId: string, count: number) => {
     const existing = data.absences.find((a) => a.date === date);
-    const text = `${name(subjectId)} ${date > now ? "plaanis" : "kirjas"}, ${tunde(count)}`;
+    const text = date > now ? `${name(subjectId)} plaanis, ${tunde(count)}` : date === now ? `${name(subjectId)} kirjas. Naudi vaba tundi.` : `${name(subjectId)} kirjas, ${tunde(count)}`;
     if (existing) {
       const prev = { ...existing.lessons };
       updateAbsence(existing.id, { ...prev, [subjectId]: (prev[subjectId] ?? 0) + count });
@@ -190,7 +215,7 @@ export default function App() {
             onLogLesson={logLesson}
           />
         )}
-        {tab === "log" && <LogAbsence setup={data.setup} rows={rows} now={now} onSave={logged} />}
+        {tab === "log" && <LogAbsence setup={data.setup} rows={rows} now={now} onSave={logged} onSaveMany={loggedMany} />}
         {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onUpdate={updateAbsence} onImport={addAbsences} />}
         {tab === "settings" && <Settings store={store} />}
       </main>

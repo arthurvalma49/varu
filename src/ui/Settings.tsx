@@ -98,6 +98,7 @@ export function Settings({ store }: { store: Store }) {
           onResult={(r) => {
             updateSetup((d) => {
               const { segments, subjects } = eduSegments(r.periods, r.className, r.groupNames, d.windowStart, d.windowEnd);
+              if (r.periodTimes) d.periodTimes = r.periodTimes;
               for (const sub of subjects.length ? subjects : r.subjects) if (!d.subjects.some((x) => x.id === sub.id)) d.subjects.push({ id: sub.id, name: sub.name, tracked: true });
               if (segments.length) {
                 d.segments = segments;

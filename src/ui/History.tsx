@@ -69,7 +69,7 @@ export function History({
 
       {!list.length ? (
         <Card>
-          <Empty title="Sissekandeid pole veel">Märgi puudumine vaates „Täna” või „Lisa”, või kleebi nimekiri oma e-koolist.</Empty>
+          <Empty title="Puhas leht">Siia tulevad sinu puudumised. Märgi need vaates „Täna” või „Lisa”, või kleebi nimekiri oma e-koolist.</Empty>
         </Card>
       ) : (
         months.map((m) => {

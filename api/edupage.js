@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     const g = tables.globals?.[0] || {};
     const out = {
       schoolName: String(g.reg_name || g.name || "").split(",")[0].trim(),
-      periods: pick(tables.periods, ["id", "period", "short"]),
+      periods: pick(tables.periods, ["id", "period", "short", "starttime", "endtime"]),
       classes: pick(tables.classes, ["id", "name"]),
       subjects: pick(tables.subjects, ["id", "name"]),
       groups: pick(tables.groups, ["id", "name", "classid", "entireclass"]),

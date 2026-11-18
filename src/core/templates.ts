@@ -41,6 +41,19 @@ const RAM9B_P2: Timetable = {
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
+/** RAM bell times 2026/27 (from ramkool.edupage.org). */
+export const RAM_PERIOD_TIMES: Record<string, { start: string; end: string }> = {
+  "1": { start: "09:00", end: "09:40" },
+  "2": { start: "09:50", end: "10:30" },
+  "3": { start: "10:40", end: "11:20" },
+  "4": { start: "11:30", end: "12:10" },
+  "5": { start: "12:50", end: "13:30" },
+  "6": { start: "13:40", end: "14:20" },
+  "7": { start: "14:30", end: "15:10" },
+  "8": { start: "15:20", end: "16:00" },
+  "9": { start: "16:00", end: "16:45" },
+};
+
 export function ram9bTemplate(): Setup {
   const ram = SCHOOLS.find((s) => s.id === "ram")!;
   return {
@@ -92,13 +105,15 @@ export function ram9bTemplate(): Setup {
       { id: "p3", name: "3. periood", start: "2027-01-05", end: "2027-02-19", timetable: clone(RAM9B_P2), assumed: true },
     ],
     holidays: [],
+    periodTimes: clone(RAM_PERIOD_TIMES),
   };
 }
 
 export const emptyTimetable = (): Timetable => ({ 1: [], 2: [], 3: [], 4: [], 5: [] });
 
-/** Upgrade setups saved by older versions. v0.1 RAM 9.b setups had no `advisory` flag. */
+/** Upgrade setups saved by older versions: RAM setups gain the `advisory` flag and bell times. */
 export function migrateSetup(s: Setup): Setup {
+  if (s.schoolId === "ram" && !s.periodTimes) s.periodTimes = clone(RAM_PERIOD_TIMES);
   if (s.schoolId === "ram")
     for (const sub of s.subjects)
       if (sub.advisory === undefined && (sub.id === "muusika" || sub.id === "klassijuhataja-tund")) sub.advisory = true;

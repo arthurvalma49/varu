@@ -1,7 +1,7 @@
 /** Guided setup helpers. Pure TypeScript, no DOM. */
 import { eachDay, isSchoolWeekday, weekdayOf } from "./dates";
 import { SCHOOLS } from "./schools";
-import { slug } from "./templates";
+import { RAM_PERIOD_TIMES, slug } from "./templates";
 import type { Absence, ISODate, Lesson, Segment, Setup, Subject, Timetable, Weekday } from "./types";
 
 /** Subjects most Estonian põhikool/gümnaasium timetables use, in a natural order. */
@@ -122,6 +122,8 @@ export interface SetupDraft {
   currentSegId?: string;
   /** How the timetable was made: imported from EduPage (default) or built by hand. */
   source?: "edupage" | "manual";
+  /** Bell times from the import, by lesson number. */
+  periodTimes?: Record<string, { start: string; end: string }>;
 }
 
 export function subjectId(name: string) {
@@ -161,6 +163,7 @@ export function buildSetup(d: SetupDraft): Setup {
       ? d.segments.map((sg) => (sg.id === d.currentSegId ? { ...sg, timetable: structuredClone(d.timetable) } : structuredClone(sg)))
       : [{ id: "s1", name: "Tunniplaan", start: from, end: d.window.end, timetable: structuredClone(d.timetable) }],
     holidays: breakDays(d.window.start, d.window.end),
+    ...(d.periodTimes && Object.keys(d.periodTimes).length ? { periodTimes: d.periodTimes } : school?.id === "ram" ? { periodTimes: structuredClone(RAM_PERIOD_TIMES) } : {}),
   };
 }
 

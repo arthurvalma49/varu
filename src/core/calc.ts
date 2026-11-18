@@ -223,3 +223,32 @@ export function dayVerdict(setup: Setup, rows: SubjectRow[], date: ISODate): Day
   }
   return { date, lessons: blocks.reduce((s, b) => s + b.count, 0), blockers, tightest };
 }
+
+/** Clock times of a lesson block from its slot ("3" or "3–4"), when the setup knows bell times. */
+export function lessonTimes(setup: Setup, l: Lesson): { start: string; end: string } | null {
+  if (!setup.periodTimes) return null;
+  const nums = l.slot.split(/[–-]/).map((x) => x.trim());
+  const a = setup.periodTimes[nums[0]];
+  const b = setup.periodTimes[nums[nums.length - 1]];
+  return a && b ? { start: a.start, end: b.end } : null;
+}
+
+/** Minutes since midnight for "HH:MM". */
+export const minutesOf = (hm: string) => {
+  const [h, m] = hm.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+
+/**
+ * Where the school day stands at clock time `nowMin` (minutes since midnight): the lesson going on
+ * now, the next one, and whether the day's lessons are over. Null when bell times are unknown.
+ */
+export function dayClock(setup: Setup, ds: ISODate, nowMin: number) {
+  const blocks = lessonsOn(setup, ds);
+  const timed = blocks.map((l, i) => ({ i, t: lessonTimes(setup, l) }));
+  if (!blocks.length || timed.some((x) => !x.t)) return null;
+  const current = timed.find((x) => minutesOf(x.t!.start) <= nowMin && nowMin < minutesOf(x.t!.end))?.i ?? null;
+  const next = timed.find((x) => minutesOf(x.t!.start) > nowMin)?.i ?? null;
+  const over = nowMin >= Math.max(...timed.map((x) => minutesOf(x.t!.end)));
+  return { current, next, over };
+}

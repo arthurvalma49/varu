@@ -69,6 +69,8 @@ export interface Setup {
   segments: Segment[];
   /** No-lesson days inside segments (holidays, school events). */
   holidays: ISODate[];
+  /** Bell times by lesson number ("1" -> 09:00-09:40), when known (EduPage import, RAM). */
+  periodTimes?: Record<string, { start: string; end: string }>;
 }
 
 export interface Absence {

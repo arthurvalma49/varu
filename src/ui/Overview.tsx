@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { dayCapacity, dayVerdict, fractionToPct, lessonsOn, missableOn, nextLesson, nextSchoolDay, planningSegment } from "../core/calc";
+import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, missableOn, nextLesson, nextSchoolDay, planningSegment } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
 import { Button, Card, Empty, Icon, Meter, Pill, Row, Section, WD_ON, WD_SHORT, cap, fmtDate, fmtLimit, joinEt, leftLabel, limitPhrase, pct, tunde } from "./kit";
 
-/** After this hour the list switches from today to the next school day. Lessons have order, not clock times. */
+/** Without bell times, the list switches from today to the next school day at this hour. */
 const SCHOOL_DAY_OVER = 15;
 
 export function Overview({
@@ -42,7 +42,13 @@ export function Overview({
 
   // Which day the lesson list is about.
   const todayHasLessons = missableOn(setup, now).length > 0;
-  const focus = todayHasLessons && new Date().getHours() < SCHOOL_DAY_OVER ? now : nextSchoolDay(setup, now);
+  const clockNow = new Date();
+  const nowMin = clockNow.getHours() * 60 + clockNow.getMinutes();
+  const clock = dayClock(setup, now, nowMin);
+  // With bell times the day rolls over after the last lesson ends; without them at a fixed hour.
+  const todayOpen = clock ? !clock.over : clockNow.getHours() < SCHOOL_DAY_OVER;
+  const focus = todayHasLessons && todayOpen ? now : nextSchoolDay(setup, now);
+  const live = focus === now ? clock : null;
   const dayWord = !focus ? "" : focus === now ? "Täna" : focus === addDays(now, 1) ? "Homme" : cap(WD_ON[weekdayOf(focus)]);
   const focusBlocks = focus ? lessonsOn(setup, focus) : [];
   const focusEntry = focus ? absences.find((a) => a.date === focus) : undefined;
@@ -115,14 +121,14 @@ export function Overview({
                 : v.tightest
                   ? v.tightest.leftAfter === 0
                     ? `Pärast seda on ${name(v.tightest.subjectId)} piiril.`
-                    : `Pärast seda jääb kõige vähem varu: ${name(v.tightest.subjectId)}, ${tunde(v.tightest.leftAfter)}.`
+                    : `${v.tightest.leftAfter >= 5 ? "Varu on küllaga. " : ""}Pärast seda jääb kõige vähem: ${name(v.tightest.subjectId)}, ${tunde(v.tightest.leftAfter)}.`
                   : "Selles päevas pole arvestatavaid tunde."}
             </p>
           </>
         ) : (
           <>
             <h2 className="m-0 text-[28px] leading-[34px] font-bold">{dayWord} on kirjas.</h2>
-            <p className="m-0 text-[15px] text-muted">Kõik selle päeva tunnid on märgitud. Muuda neid ajaloos.</p>
+            <p className="m-0 text-[15px] text-muted">{focus === now ? "Kõik tänased tunnid on märgitud. Naudi päeva." : "Kõik selle päeva tunnid on märgitud."} Muuta saad ajaloos.</p>
           </>
         )}
         {over.length > 0 && (
@@ -144,8 +150,8 @@ export function Overview({
             if (b.selfStudy)
               return (
                 <Row key={i} detail={<span className="text-[15px]">iseõpe</span>}>
-                  <div className="flex items-baseline gap-3 text-muted">
-                    <span className="num text-[15px] w-8">{b.slot}.</span>
+                  <div className="flex items-center gap-3 text-muted">
+                    <SlotLabel slot={b.slot} time={lessonTimes(setup, b)?.start} past />
                     <span>{name(b.subjectId)}</span>
                   </div>
                 </Row>
@@ -156,8 +162,19 @@ export function Overview({
             const ok = !r || after >= 0;
             const nextIsMh = !!r && r.left >= 0 && after < 0;
             return (
-              <div key={i} className="cell flex items-center gap-3 px-5 min-h-[60px]">
-                <span className="num text-[15px] text-muted w-8 shrink-0">{b.slot}.</span>
+              <div key={i} className={`cell flex items-center gap-3 px-5 min-h-[60px] ${live && (live.current === i || (live.current === null && live.next === i)) ? "bg-accent-soft/60" : ""}`}>
+                <SlotLabel
+                  slot={b.slot}
+                  time={lessonTimes(setup, b)?.start}
+                  past={!!live && !!lessonTimes(setup, b) && minutesOf(lessonTimes(setup, b)!.end) <= nowMin}
+                  tag={
+                    live?.current === i
+                      ? "praegu"
+                      : live?.next === i && live.current === null
+                        ? countdown(minutesOf(lessonTimes(setup, b)!.start) - nowMin)
+                        : undefined
+                  }
+                />
                 <div className="flex-1 min-w-0 py-2">
                   <div className="truncate">{name(b.subjectId)}</div>
                   <div className={`text-[13px] num ${done ? "text-muted" : ok ? "text-ok" : "text-bad"}`}>
@@ -242,6 +259,38 @@ export function Overview({
       </div>
     </div>
   );
+}
+
+/** Start time when known, else the lesson number. A live tag replaces the lesson number line. */
+function SlotLabel({ slot, time, past, tag }: { slot: string; time?: string; past?: boolean; tag?: string }) {
+  return (
+    <span className={`num shrink-0 w-14 leading-tight ${past ? "text-faint" : "text-muted"}`}>
+      {time ? (
+        <>
+          <span className={`block text-[15px] ${tag ? "text-accent font-semibold" : ""}`}>{time}</span>
+          {tag ? (
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-accent">
+              <span className="relative flex size-1.5 shrink-0" aria-hidden>
+                <span className="pulse absolute inline-flex size-full rounded-full bg-accent opacity-60" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-accent" />
+              </span>
+              {tag}
+            </span>
+          ) : (
+            <span className="block text-[11px]">{slot}. tund</span>
+          )}
+        </>
+      ) : (
+        <span className="text-[15px]">{slot}.</span>
+      )}
+    </span>
+  );
+}
+
+/** "järgmine", "5 min", "1 h 5 min": how soon the next lesson starts. */
+function countdown(min: number) {
+  if (min > 120 || min < 0) return "järgmine";
+  return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
 }
 
 function blockSizes(setup: Setup, subjectId: string, now: string) {
