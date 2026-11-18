@@ -58,7 +58,10 @@ export function Settings({ store }: { store: Store }) {
             Periood ja klass
           </Row>
         </Section>
-        <Section title="Tunniplaan">
+        <Section title="Tunniplaan" footer="Import loeb kooli tunniplaani edupage.org-ist (nt RAM: ramkool). Pärast saad seda muuta.">
+          <Row onClick={() => open("edupage")} chevron>
+            <span className="text-accent">Impordi EduPage'ist</span>
+          </Row>
           <Row onClick={() => open("subjects")} chevron detail={<span className="num">{setup.subjects.filter((s) => s.tracked).length}</span>}>
             Ained
           </Row>
@@ -91,6 +94,7 @@ export function Settings({ store }: { store: Store }) {
       {page === "edupage" && (
         <EduImport
           actionLabel="Asenda tunniplaanid"
+          initial={setup.schoolId === "ram" ? "ramkool" : ""}
           onResult={(r) => {
             updateSetup((d) => {
               const { segments, subjects } = eduSegments(r.periods, r.className, r.groupNames, d.windowStart, d.windowEnd);
