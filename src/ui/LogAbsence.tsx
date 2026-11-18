@@ -45,10 +45,11 @@ export function LogAbsence({ setup, rows, now, onSave }: { setup: Setup; rows: S
   if (wd === 0 || wd === 6) info = "Nädalavahetus, tunde pole.";
   else if (!inWindow(setup, date)) info = "Väljaspool arvestusperioodi, ei lähe arvesse.";
   else if (setup.holidays.includes(date)) info = "Vaba päev, tunde pole.";
-  else if (!seg) info = "Selle päeva tunniplaani pole. Lisa tunnid käsitsi.";
+  else if (!seg) info = "Sel päeval tunniplaanis tunde pole (nt vaheaeg). Kui tund siiski toimus, lisa see käsitsi.";
   else if (blocks.length && blocks.every((b) => b.selfStudy)) info = "Iseõppepäev, loeb kohalolekuna.";
   else if (seg.assumed) info = `${seg.name}, tunniplaan eeldatud.`;
-  if (future && inWindow(setup, date)) info = `${info} Läheb plaanina kirja ja hakkab lugema, kui päev käes.`.trim();
+  const canLog = blocks.some((b) => !b.selfStudy) || noTimetable || Object.keys(extra).length > 0;
+  if (future && inWindow(setup, date) && canLog) info = `${info} Läheb plaanina kirja ja hakkab lugema, kui päev käes.`.trim();
 
   const save = () => {
     if (!p.total) return;

@@ -238,13 +238,19 @@ function RulePage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }) {
         ))}
       </Section>
 
-      <Section title="Tagajärg">
+      <Section title="Tagajärg" footer="Mis juhtub, kui jõuad piirini. Näidatakse esilehel, kui aine on üle piiri.">
         <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
           <span>Automaatne (mitte õpetaja otsus)</span>
           <Switch label="Tagajärg on automaatne" checked={setup.rule.automatic} onChange={(v) => updateSetup((d) => void (d.rule.automatic = v))} />
         </div>
-        <label className="cell flex items-center px-5">
-          <input className="cell-input" aria-label="Mis juhtub piiri ületamisel" value={setup.rule.consequence} onChange={(e) => updateSetup((d) => void (d.rule.consequence = e.target.value))} />
+        <label className="cell flex px-5 py-3">
+          <textarea
+            rows={2}
+            className="w-full bg-transparent border-0 outline-none resize-none leading-snug"
+            aria-label="Mis juhtub piiri ületamisel"
+            value={setup.rule.consequence}
+            onChange={(e) => updateSetup((d) => void (d.rule.consequence = e.target.value))}
+          />
         </label>
       </Section>
     </>
@@ -533,7 +539,7 @@ function SharePage({ data, replaceAll, setMsg }: { data: AppData; replaceAll: St
       </Section>
       <Section title="Said koodi?" footer="Asendab sinu tunniplaani ja reegli. Sinu puudumised jäävad alles.">
         <div className="cell flex items-center gap-3 px-5 min-h-[52px]">
-          <input className="cell-input font-mono text-[16px] flex-1 placeholder:text-faint" enterKeyHint="go" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="Kood või link" aria-label="Jagamiskood" value={code} onChange={(e) => setCode(e.target.value)} />
+          <input className="cell-input font-mono text-[16px] flex-1 placeholder:text-faint placeholder:font-sans placeholder:text-[17px]" enterKeyHint="go" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="Kood või link" aria-label="Jagamiskood" value={code} onChange={(e) => setCode(e.target.value)} />
           <Button
             variant="ghost"
             className="min-h-8 px-3"

@@ -285,14 +285,6 @@ export function Meter({ pct: p, planPct = 0, limitPct, status, label }: { pct: n
   );
 }
 
-export function Label({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
-  return (
-    <label htmlFor={htmlFor} className="text-[13px] text-muted">
-      {children}
-    </label>
-  );
-}
-
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="text-center py-8 px-4 flex flex-col gap-1.5 items-center">

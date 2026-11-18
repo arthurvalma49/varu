@@ -101,9 +101,12 @@ describe("status, plans and day verdicts", () => {
     expect(dayVerdict(setup, rows, "2026-11-26").blockers).toEqual([]);
   });
 
-  it("a subject already over the limit does not block a day (it is lost either way)", () => {
+  it("a subject already over the limit neither blocks a day nor counts as least left", () => {
     const rows = summary(setup, [ab("2026-11-12", { "hispaania-keel": 14 })], "2026-11-18");
-    expect(dayVerdict(setup, rows, "2026-11-19").blockers).toEqual([]);
+    const v = dayVerdict(setup, rows, "2026-11-19");
+    expect(v.blockers).toEqual([]);
+    expect(v.tightest?.subjectId).not.toBe("hispaania-keel");
+    expect(v.tightest!.leftAfter).toBeGreaterThanOrEqual(0);
   });
 
   it("next school day skips self-study Tuesdays and weekends; next lesson finds the subject", () => {

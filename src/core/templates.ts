@@ -97,25 +97,6 @@ export function ram9bTemplate(): Setup {
 
 export const emptyTimetable = (): Timetable => ({ 1: [], 2: [], 3: [], 4: [], 5: [] });
 
-export function blankSetup(schoolId: string): Setup {
-  const school = SCHOOLS.find((s) => s.id === schoolId);
-  const y = new Date().getFullYear();
-  return {
-    version: 1,
-    schoolId: school?.id ?? "custom",
-    schoolName: school?.name ?? "Minu kool",
-    className: "",
-    windowName: "Poolaasta",
-    windowStart: `${y}-09-01`,
-    windowEnd: `${y + 1}-01-25`,
-    rule: clone(school?.rule ?? SCHOOLS[0].rule),
-    subjects: [],
-    baseline: {},
-    segments: [{ id: "s1", name: "Tunniplaan", start: `${y}-09-01`, end: `${y + 1}-01-25`, timetable: emptyTimetable() }],
-    holidays: [],
-  };
-}
-
 /** Upgrade setups saved by older versions. v0.1 RAM 9.b setups had no `advisory` flag. */
 export function migrateSetup(s: Setup): Setup {
   if (s.schoolId === "ram")

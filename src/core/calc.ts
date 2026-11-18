@@ -202,7 +202,7 @@ export interface DayVerdict {
   lessons: number;
   /** Graded subjects that would newly go over the limit if the whole day is missed. */
   blockers: string[];
-  /** Graded subject with the least left after missing the day (null if none counted). */
+  /** Graded subject with the least left after missing the day, among those that stay within the limit. */
   tightest: { subjectId: string; leftAfter: number } | null;
 }
 
@@ -219,7 +219,7 @@ export function dayVerdict(setup: Setup, rows: SubjectRow[], date: ISODate): Day
     const leftAfter = r.left - k;
     // Only subjects that would newly cross the limit block the day; one already over is lost either way.
     if (r.left >= 0 && leftAfter < 0) blockers.push(r.subject.id);
-    if (!tightest || leftAfter < tightest.leftAfter) tightest = { subjectId: r.subject.id, leftAfter };
+    if (r.left >= 0 && leftAfter >= 0 && (!tightest || leftAfter < tightest.leftAfter)) tightest = { subjectId: r.subject.id, leftAfter };
   }
   return { date, lessons: blocks.reduce((s, b) => s + b.count, 0), blockers, tightest };
 }

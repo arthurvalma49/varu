@@ -60,7 +60,7 @@ export function Overview({
       if (!r || r.subject.advisory) continue;
       const leftAfter = r.left - k;
       if (r.left >= 0 && leftAfter < 0) blockers.push(id);
-      if (!tightest || leftAfter < tightest.leftAfter) tightest = { subjectId: id, leftAfter };
+      if (r.left >= 0 && leftAfter >= 0 && (!tightest || leftAfter < tightest.leftAfter)) tightest = { subjectId: id, leftAfter };
     }
     return { date: focus!, lessons: open.reduce((x, b) => x + b.count, 0), blockers, tightest };
   }
@@ -96,7 +96,10 @@ export function Overview({
           </span>
         )}
         {!focus ? (
-          <h2 className="m-0 text-[28px] leading-[34px] font-bold">Selle perioodi koolipäevad on läbi.</h2>
+          <>
+            <h2 className="m-0 text-[28px] leading-[34px] font-bold">Selle perioodi koolipäevad on läbi.</h2>
+            <p className="m-0 text-[15px] text-muted">Uue perioodi jaoks muuda kuupäevad ja impordi uus tunniplaan seadetes.</p>
+          </>
         ) : v ? (
           <>
             <h2 className={`m-0 text-[28px] leading-[34px] font-bold ${v.blockers.length ? "text-bad" : ""}`}>
@@ -187,6 +190,7 @@ export function Overview({
       )}
 
       {/* Whole days per weekday */}
+      {focus && (
       <Section title="Terveid päevi võid veel vahele jätta" footer={seg?.assumed ? "Eeldusel, et tunniplaan jääb samaks." : undefined}>
         <div className="grid grid-cols-5 gap-1.5 p-3">
           {([1, 2, 3, 4, 5] as Weekday[]).map((d) => {
@@ -197,8 +201,8 @@ export function Overview({
               <div
                 key={d}
                 className={`rounded-[16px] py-2.5 text-center flex flex-col gap-0.5 ${tone} ${weekdayOf(now) === d ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""}`}
-                aria-label={weekdayOf(now) === d ? "täna" : undefined}
               >
+                {weekdayOf(now) === d && <span className="sr-only">Täna. </span>}
                 <b className={`num leading-none ${c === null ? "text-[13px] leading-[26px] font-medium" : "text-[26px] font-semibold"}`}>
                   {c === null ? (selfStudy ? "iseõpe" : "vaba") : c}
                 </b>
@@ -208,6 +212,7 @@ export function Overview({
           })}
         </div>
       </Section>
+      )}
 
       {/* Subjects */}
       {groups.map((g) => {
