@@ -163,6 +163,7 @@ export function EduImport({
         }
       >
         <form
+          noValidate
           className="cell flex items-center gap-3 pl-5 pr-3 min-h-[52px]"
           onSubmit={(e) => {
             e.preventDefault();
@@ -174,7 +175,7 @@ export function EduImport({
           </label>
           <input
             id="edu-address"
-            type="url"
+            type="text"
             className="cell-input flex-1 min-w-0 text-right text-accent text-[16px] placeholder:text-faint"
             placeholder="kool.edupage.org"
             aria-label="Kooli EduPage aadress"
