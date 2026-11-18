@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, missableOn, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
+import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
 import { ActionSheet, Button, Card, Empty, Icon, Meter, Pill, Row, Section, SwipeRow, useLongPress, type SheetAction, type SwipeAction, WD_ON, WD_SHORT, cap, fmtDate, fmtLimit, joinEt, leftLabel, limitPhrase, pct, tunde } from "./kit";
@@ -49,12 +49,17 @@ export function Overview({
   const mh = setup.rule.automatic ? "MH" : "üle piiri";
 
   // Which day the lesson list is about.
-  const todayHasLessons = missableOn(setup, now).length > 0;
+  // Today stays in focus until its last planned lesson ends (cancelled and self-study lessons
+  // included), then the next school day takes over.
+  const todayPlanned = timetableOn(setup, now);
+  const todayHasLessons = todayPlanned.length > 0;
   const clockNow = new Date();
   const nowMin = clockNow.getHours() * 60 + clockNow.getMinutes();
   const clock = dayClock(setup, now, nowMin);
+  const plannedTimes = todayPlanned.map((b) => lessonTimes(setup, b));
+  const lastEnd = plannedTimes.length && plannedTimes.every(Boolean) ? Math.max(...plannedTimes.map((t) => minutesOf(t!.end))) : null;
   // With bell times the day rolls over after the last lesson ends; without them at a fixed hour.
-  const todayOpen = clock ? !clock.over : clockNow.getHours() < SCHOOL_DAY_OVER;
+  const todayOpen = lastEnd !== null ? nowMin < lastEnd : clockNow.getHours() < SCHOOL_DAY_OVER;
   const focus = todayHasLessons && todayOpen ? now : nextSchoolDay(setup, now);
   const live = focus === now ? clock : null;
   const dayWord = !focus ? "" : focus === now ? "Täna" : focus === addDays(now, 1) ? "Homme" : cap(WD_ON[weekdayOf(focus)]);
@@ -72,7 +77,10 @@ export function Overview({
     })
     .filter((b) => b.count > 0);
   const partial = !!focusEntry && open.length > 0;
-  const v = !focus || (focusEntry && !open.length) ? null : partial ? restVerdict() : dayVerdict(setup, rows, focus);
+  // Today is in focus but nothing in it can be missed: all self-study or all cancelled.
+  const nothingToMiss = !!focus && focusBlocks.every((b) => b.selfStudy);
+  const nextDay = nothingToMiss ? nextSchoolDay(setup, focus!) : null;
+  const v = !focus || nothingToMiss || (focusEntry && !open.length) ? null : partial ? restVerdict() : dayVerdict(setup, rows, focus);
   function restVerdict() {
     const blockers: string[] = [];
     let tightest: { subjectId: string; leftAfter: number } | null = null;
@@ -140,6 +148,14 @@ export function Overview({
                     ? `Pärast seda on ${name(v.tightest.subjectId)} piiril.`
                     : `${v.tightest.leftAfter >= 5 ? "Varu on küllaga. " : ""}Pärast seda jääb kõige vähem: ${name(v.tightest.subjectId)}, ${tunde(v.tightest.leftAfter)}.`
                   : "Selles päevas pole arvestatavaid tunde."}
+            </p>
+          </>
+        ) : nothingToMiss ? (
+          <>
+            <h2 className="m-0 text-[28px] leading-[34px] font-bold">{focusBlocks.length ? `${dayWord} on iseõpe.` : `${dayWord} tunde ei toimu.`}</h2>
+            <p className="m-0 text-[15px] text-muted">
+              {focusBlocks.length ? "Iseõpe loeb kohalolekuna, varu see ei võta." : "Kõik selle päeva tunnid jäävad ära."}
+              {nextDay ? ` Järgmine koolipäev: ${fmtDate(nextDay)}.` : ""}
             </p>
           </>
         ) : (
