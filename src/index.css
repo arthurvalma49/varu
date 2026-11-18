@@ -226,8 +226,64 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   height: 0.5px;
   background: var(--line);
 }
+/*
+ * Motion system, taken from Apple's spring model (WWDC23 "Animate with springs": duration + bounce).
+ * Curves are the real spring sampled into linear(); durations are when each spring settles.
+ *   smooth  = spring(0.5s, bounce 0)    sheets, push/pop, large moves
+ *   snappy  = spring(0.4s, bounce 0.15) selection pills, switches, toasts
+ *   bouncy  = spring(0.45s, bounce 0.3) Liquid Glass controls springing back after a press
+ *   quick   = spring(0.3s, bounce 0)    dismissals, swipe-row snaps
+ */
+:root {
+  --spring-smooth: linear(0, 0.0348, 0.1155, 0.2169, 0.3233, 0.4258, 0.5196, 0.6026, 0.6742, 0.735, 0.7859, 0.8279, 0.8623, 0.8904, 0.913, 0.9312, 0.9457, 0.9573, 0.9665, 0.9738, 0.9795, 0.984, 0.9876, 0.9903, 0.9925, 0.9942, 0.9955, 0.9965, 0.9973, 0.9979, 1);
+  --dur-smooth: 690ms;
+  --spring-snappy: linear(0, 0.0332, 0.1135, 0.218, 0.3313, 0.443, 0.5468, 0.6393, 0.7191, 0.786, 0.8409, 0.8848, 0.9192, 0.9456, 0.9654, 0.9799, 0.9901, 0.9971, 1.0016, 1.0043, 1.0057, 1.0063, 1.0062, 1.0058, 1.0052, 1.0045, 1.0038, 1.0031, 1.0025, 1.0019, 1);
+  --dur-snappy: 530ms;
+  --spring-bouncy: linear(0, 0.0425, 0.1457, 0.2799, 0.4233, 0.5614, 0.6851, 0.7897, 0.8737, 0.9378, 0.9841, 1.0151, 1.0339, 1.0434, 1.046, 1.044, 1.0393, 1.0331, 1.0265, 1.0202, 1.0145, 1.0097, 1.0058, 1.0029, 1.0007, 0.9993, 0.9984, 0.998, 0.9979, 0.998, 1);
+  --dur-bouncy: 680ms;
+  --spring-quick: linear(0, 0.0361, 0.1193, 0.2231, 0.3316, 0.4355, 0.53, 0.6131, 0.6845, 0.7447, 0.7948, 0.836, 0.8695, 0.8966, 0.9184, 0.9358, 0.9497, 0.9606, 0.9693, 0.9761, 0.9814, 0.9856, 0.9888, 0.9914, 0.9933, 0.9949, 0.996, 0.997, 0.9977, 0.9982, 1);
+  --dur-quick: 420ms;
+}
+/*
+ * Touch feedback, as in UIKit: the highlight appears the instant a finger lands (no transition
+ * on the way in) and fades out over ~0.3s on release.
+ */
+/* List rows: grey highlight. */
+.press {
+  transition: background-color 320ms ease-out;
+}
 .press:active {
   background: var(--surface-2);
+  transition-duration: 0s;
+}
+/* Text and filled buttons: dim. */
+.tap {
+  transition: opacity 260ms ease-out;
+}
+.tap:active {
+  opacity: 0.5;
+  transition-duration: 0s;
+}
+/* Liquid Glass controls flex and light up under the finger, then spring back. */
+.glass-btn {
+  transition:
+    transform var(--dur-bouncy) var(--spring-bouncy),
+    filter 300ms ease-out;
+}
+.glass-btn:active {
+  transform: scale(1.14);
+  filter: brightness(1.12);
+  transition:
+    transform 220ms var(--spring-quick),
+    filter 0s;
+}
+/* Tab bar items lift under the finger the same way. */
+.tab-btn > * {
+  transition: transform var(--dur-bouncy) var(--spring-bouncy);
+}
+.tab-btn:active > * {
+  transform: scale(1.12);
+  transition: transform 220ms var(--spring-quick);
 }
 /* Liquid Glass stand-in for floating controls (tab bar, nav buttons): translucent, blurred, lit edge. */
 .glass {
@@ -262,12 +318,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
   }
   .toast-in {
-    animation: rise 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: rise var(--dur-snappy) var(--spring-snappy);
   }
   @keyframes rise {
     from {
       opacity: 0;
-      transform: translateY(12px) scale(0.98);
+      transform: translateY(24px) scale(0.94);
     }
   }
   @keyframes fade {
@@ -277,19 +333,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
   }
 }
-/* Sheets rise with a spring-like curve; the page behind recedes like on iOS. */
+/* Sheets slide up on Apple's default spring. The page behind only dims (no zoom). */
 .sheet {
-  transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform var(--dur-smooth) var(--spring-smooth);
 }
-#app-main {
-  transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), filter 420ms, border-radius 420ms;
-  transform-origin: 50% 0;
+.sheet.closing {
+  transition: transform var(--dur-quick) var(--spring-quick);
 }
-.sheet-open #app-main {
-  transform: scale(0.92) translateY(calc(env(safe-area-inset-top) + 8px));
-  border-radius: 26px;
-  filter: brightness(0.85);
-  overflow: hidden;
+.backdrop {
+  transition: opacity var(--dur-quick) ease-out;
 }
 .sheet-open body {
   overflow: hidden;
@@ -339,10 +391,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* Push / pop between settings pages. */
 @media (prefers-reduced-motion: no-preference) {
   .push-in {
-    animation: push-in 380ms cubic-bezier(0.32, 0.72, 0, 1);
+    animation: push-in var(--dur-smooth) var(--spring-smooth);
   }
   .pop-in {
-    animation: pop-in 380ms cubic-bezier(0.32, 0.72, 0, 1);
+    animation: pop-in var(--dur-smooth) var(--spring-smooth);
   }
   @keyframes push-in {
     from {
@@ -359,8 +411,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 @media (prefers-reduced-motion: reduce) {
   .sheet,
-  #app-main {
+  .sheet.closing,
+  .glass-btn,
+  .glass-btn:active,
+  .tab-btn > *,
+  .tab-btn:active > * {
     transition: none;
+  }
+  .glass-btn:active,
+  .tab-btn:active > * {
+    transform: none;
   }
 }
 .no-callout {

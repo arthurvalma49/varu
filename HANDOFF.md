@@ -60,3 +60,10 @@ Known gaps:
 - Keep `src/core` free of React/DOM imports.
 - Never use em dashes in UI copy or docs; no emojis.
 - Run `npm test` and `npm run build` before calling something done.
+
+## Motion and touch feedback
+- One motion system in `src/index.css`: Apple springs (WWDC23 "Animate with springs", duration + bounce) sampled into CSS `linear()` as `--spring-smooth|snappy|bouncy|quick` with matching `--dur-*`. Use these, not ad-hoc cubic-beziers.
+- Touch feedback as in UIKit: `.press` (row highlight), `.tap` (dim), `.glass-btn` / `.tab-btn` (Liquid Glass flex: scale up and brighten, spring back). Highlights appear instantly on touch-down and fade on release. `main.tsx` adds an empty touchstart listener because iOS Safari otherwise never applies `:active`.
+- Sheets slide up over a dimmed page; the page behind no longer zooms out. Segmented and tab pills slide; the switch knob stretches while held.
+- `src/ui/haptics.ts`: light haptic on Android (vibrate) and iOS 18+ (hidden native switch). Fired on Puudun, swipe and action-sheet actions, long press and switches.
+

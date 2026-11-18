@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { haptic } from "./haptics";
 import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, missableOn, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
@@ -248,7 +249,11 @@ export function Overview({
                 },
               ];
               const askHalf = () => setSheet({ title: `${name(b.subjectId)}: paaristund`, message: "Millest puudud?", actions: skipActions });
-              const skip = () => (remaining > 1 ? askHalf() : onLogLesson(focus, b.subjectId, remaining));
+              const skip = () => {
+                if (remaining > 1) return askHalf();
+                haptic();
+                onLogLesson(focus, b.subjectId, remaining);
+              };
               const openMore = () => setSheet({ title: `${name(b.subjectId)}${t ? `, ${t.start}` : ""}`, message: status, actions: done ? cancelActions : [...skipActions, ...cancelActions] });
               const swipe: SwipeAction[] = done
                 ? []

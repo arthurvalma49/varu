@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { haptic } from "./haptics";
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type PointerEvent as RPointerEvent, type ReactNode } from "react";
 import { fractionToPct } from "../core/calc";
 import type { Fraction, Rule, Status } from "../core/types";
@@ -108,7 +109,7 @@ export function PlusButton({ onClick, label = "Lisa puudumine", small }: { onCli
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`glass rounded-full grid place-items-center text-accent cursor-pointer active:scale-95 transition-transform ${small ? "size-9" : "size-11"}`}
+      className={`glass glass-btn rounded-full grid place-items-center text-accent cursor-pointer ${small ? "size-9" : "size-11"}`}
     >
       <Icon name="plus" size={small ? 20 : 24} stroke={2.4} />
     </button>
@@ -119,7 +120,7 @@ export function PlusButton({ onClick, label = "Lisa puudumine", small }: { onCli
 export function NavBar({ title, onBack, backLabel = "Tagasi", trailing }: { title: string; onBack: () => void; backLabel?: string; trailing?: ReactNode }) {
   return (
     <div className="sticky top-0 z-10 -mx-4 px-4 pt-[calc(env(safe-area-inset-top)+8px)] pb-2 grid grid-cols-[44px_1fr_44px] items-center gap-2 bg-gradient-to-b from-bg via-bg/90 to-bg/0">
-      <button type="button" onClick={onBack} aria-label={backLabel} className="glass size-11 rounded-full grid place-items-center text-ink cursor-pointer active:scale-95 transition-transform">
+      <button type="button" onClick={onBack} aria-label={backLabel} className="glass glass-btn size-11 rounded-full grid place-items-center text-ink cursor-pointer">
         <Icon name="left" size={22} stroke={2.4} />
       </button>
       <div className="font-semibold text-[17px] text-center truncate">{title}</div>
@@ -232,7 +233,7 @@ export function Button({
   return (
     <button
       type="button"
-      className={`${s} font-semibold cursor-pointer active:opacity-60 transition-opacity duration-100 disabled:opacity-35 disabled:cursor-not-allowed ${v} ${className}`}
+      className={`${s} tap font-semibold cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${v} ${className}`}
       {...rest}
     />
   );
@@ -251,7 +252,16 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="grid auto-cols-fr grid-flow-col p-[3px] rounded-full bg-surface-2">
+    <div role="radiogroup" aria-label={label} className="relative grid auto-cols-fr grid-flow-col p-[3px] rounded-full bg-surface-2">
+      {/* The selected pill slides between options on a snappy spring, like UISegmentedControl. */}
+      <span
+        aria-hidden
+        className="absolute top-[3px] bottom-[3px] left-[3px] rounded-full bg-raised shadow-[0_3px_8px_rgb(0_0_0/0.12),0_3px_1px_rgb(0_0_0/0.04)] transition-transform duration-(--dur-snappy) ease-(--spring-snappy) motion-reduce:transition-none"
+        style={{
+          width: `calc((100% - 6px) / ${options.length})`,
+          transform: `translateX(${Math.max(0, options.findIndex((o) => o.value === value)) * 100}%)`,
+        }}
+      />
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -261,9 +271,7 @@ export function Segmented<T extends string>({
             role="radio"
             aria-checked={on}
             onClick={() => onChange(o.value)}
-            className={`min-h-[34px] px-2 rounded-full text-[14px] cursor-pointer transition-[background-color,box-shadow] duration-150 ${
-              on ? "bg-raised font-semibold shadow-[0_3px_8px_rgb(0_0_0/0.12),0_3px_1px_rgb(0_0_0/0.04)]" : "font-medium"
-            }`}
+            className={`relative min-h-[34px] px-2 rounded-full text-[14px] cursor-pointer transition-opacity duration-200 active:opacity-60 ${on ? "font-semibold" : "font-medium"}`}
           >
             {o.label}
           </button>
@@ -282,12 +290,16 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
       aria-checked={checked}
       aria-label={label}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative shrink-0 w-[51px] h-[31px] rounded-full cursor-pointer transition-colors duration-200 disabled:opacity-40 ${checked ? "bg-ok-fill" : "bg-surface-2"}`}
+      onClick={() => {
+        haptic();
+        onChange(!checked);
+      }}
+      className={`group relative shrink-0 w-[51px] h-[31px] rounded-full cursor-pointer transition-colors duration-300 disabled:opacity-40 ${checked ? "bg-ok-fill" : "bg-surface-2"}`}
     >
+      {/* Like UISwitch: the knob stretches while held, then springs across. */}
       <span
-        className={`absolute top-[2px] left-[2px] size-[27px] rounded-full bg-white shadow-[0_3px_8px_rgb(0_0_0/0.15),0_3px_1px_rgb(0_0_0/0.06)] transition-transform duration-200 ${
-          checked ? "translate-x-5" : ""
+        className={`absolute top-[2px] left-[2px] h-[27px] w-[27px] group-active:w-[34px] rounded-full bg-white shadow-[0_3px_8px_rgb(0_0_0/0.15),0_3px_1px_rgb(0_0_0/0.06)] transition-[transform,width] duration-(--dur-snappy) ease-(--spring-snappy) motion-reduce:transition-none ${
+          checked ? "translate-x-5 group-active:translate-x-[13px]" : ""
         }`}
       />
     </button>
@@ -296,7 +308,7 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
 
 /** Value plus an iOS − | + stepper. */
 export function Stepper({ value, onChange, label, max = 99 }: { value: number; onChange: (n: number) => void; label: string; max?: number }) {
-  const btn = "w-[47px] h-8 grid place-items-center cursor-pointer active:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed";
+  const btn = "press w-[47px] h-8 grid place-items-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed";
   return (
     <div className="flex items-center gap-3" role="group" aria-label={label}>
       <span className={`num text-[17px] w-6 text-right ${value ? "" : "text-muted"}`} aria-live="polite">
@@ -399,8 +411,8 @@ function usePresence(open: boolean, ms = 300) {
 }
 
 let sheetsOpen = 0;
-/** While a sheet is open the page behind recedes (scaled, dimmed) and does not scroll, as on iOS. */
-function useRecede(active: boolean) {
+/** While a sheet is open the page behind does not scroll. */
+function useScrollLock(active: boolean) {
   useEffect(() => {
     if (!active) return;
     sheetsOpen++;
@@ -413,7 +425,7 @@ function useRecede(active: boolean) {
 }
 
 /**
- * iOS sheet: rises from the bottom, the page behind recedes, swipe the grabber or header down
+ * iOS sheet: slides up on a smooth spring over a dimmed page; swipe the grabber or header down
  * to dismiss. `leading` defaults to a Loobu button.
  */
 export function Sheet({
@@ -429,10 +441,10 @@ export function Sheet({
   trailing?: ReactNode;
   children: ReactNode;
 }) {
-  const { mounted, shown } = usePresence(open);
+  const { mounted, shown } = usePresence(open, 450);
   const [drag, setDrag] = useState(0);
   const start = useRef<{ y: number; t: number } | null>(null);
-  useRecede(open);
+  useScrollLock(open);
   useEffect(() => {
     if (!open) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -452,18 +464,18 @@ export function Sheet({
     if (drag > 120 || (fast && drag > 40)) onClose();
     setDrag(0);
   };
-  // Rendered at the top of the page so the receding page and the tab bar never cover it.
+  // Rendered at the top of the page so the tab bar never covers it.
   return createPortal(
     <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={title}>
-      <div className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
+      <div className={`backdrop absolute inset-0 bg-black/40 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
       <div
-        className="sheet absolute inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+30px)] max-w-[640px] mx-auto bg-bg rounded-t-[26px] shadow-[0_-10px_40px_rgb(0_0_0/0.25)] flex flex-col overflow-hidden"
+        className={`sheet ${shown ? "" : "closing"} absolute inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+30px)] max-w-[640px] mx-auto bg-bg rounded-t-[26px] shadow-[0_-10px_40px_rgb(0_0_0/0.25)] flex flex-col overflow-hidden`}
         style={{ transform: shown ? `translateY(${drag}px)` : "translateY(100%)", transition: drag ? "none" : undefined }}
       >
         <div className="shrink-0 touch-none cursor-grab" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
           <div className="mx-auto mt-2 h-[5px] w-9 rounded-full bg-faint" aria-hidden />
           <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 pt-1.5 pb-2 min-h-12">
-            <button type="button" onClick={onClose} className="justify-self-start text-accent text-[17px] min-h-11 pr-3 cursor-pointer">
+            <button type="button" onClick={onClose} className="tap justify-self-start text-accent text-[17px] min-h-11 pr-3 cursor-pointer">
               Loobu
             </button>
             <div className="font-semibold text-[17px] truncate">{title}</div>
@@ -486,13 +498,14 @@ export interface SheetAction {
 
 /** iOS action sheet: a group of choices and a separate Loobu, sliding up from the bottom. */
 export function ActionSheet({ open, onClose, title, message, actions }: { open: boolean; onClose: () => void; title?: string; message?: string; actions: SheetAction[] }) {
-  const { mounted, shown } = usePresence(open, 260);
+  const { mounted, shown } = usePresence(open, 450);
+  useScrollLock(open);
   if (!mounted) return null;
   return createPortal(
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title ?? "Valikud"}>
-      <div className={`absolute inset-0 bg-black/35 transition-opacity duration-200 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
+      <div className={`backdrop absolute inset-0 bg-black/35 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
       <div
-        className="sheet absolute inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+8px)] max-w-[480px] mx-auto flex flex-col gap-2"
+        className={`sheet ${shown ? "" : "closing"} absolute inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+8px)] max-w-[480px] mx-auto flex flex-col gap-2`}
         style={{ transform: shown ? "translateY(0)" : "translateY(110%)" }}
       >
         <div className="glass rounded-[16px] overflow-hidden">
@@ -508,15 +521,16 @@ export function ActionSheet({ open, onClose, title, message, actions }: { open: 
               type="button"
               onClick={() => {
                 onClose();
+                haptic();
                 a.onClick();
               }}
-              className={`w-full min-h-[56px] px-4 text-[19px] cursor-pointer active:bg-surface-2 ${i ? "border-t border-line" : ""} ${a.destructive ? "text-bad" : "text-accent"} ${a.bold ? "font-semibold" : ""}`}
+              className={`press w-full min-h-[56px] px-4 text-[19px] cursor-pointer ${i ? "border-t border-line" : ""} ${a.destructive ? "text-bad" : "text-accent"} ${a.bold ? "font-semibold" : ""}`}
             >
               {a.label}
             </button>
           ))}
         </div>
-        <button type="button" onClick={onClose} className="glass w-full min-h-[56px] rounded-[16px] text-[19px] font-semibold text-accent cursor-pointer active:bg-surface-2">
+        <button type="button" onClick={onClose} className="glass press w-full min-h-[56px] rounded-[16px] text-[19px] font-semibold text-accent cursor-pointer">
           Loobu
         </button>
       </div>
@@ -547,6 +561,7 @@ export function useLongPress(onLong: () => void, ms = 480) {
     onContextMenu: (e: { preventDefault: () => void }) => {
       e.preventDefault();
       clear();
+      haptic();
       onLong();
     },
   };
@@ -617,6 +632,7 @@ export function SwipeRow({ actions, children, className = "", ...rest }: { actio
             onClick={() => {
               setOpenRow(false);
               setX(0);
+              haptic();
               a.onClick();
             }}
             className={`flex-1 flex flex-col items-center justify-center gap-1 text-white text-[13px] font-medium cursor-pointer ${SWIPE_TONE[a.tone]}`}
@@ -628,7 +644,7 @@ export function SwipeRow({ actions, children, className = "", ...rest }: { actio
       </div>
       <div
         className="relative bg-surface touch-pan-y select-none"
-        style={{ transform: `translateX(${x}px)`, transition: g.current ? "none" : "transform 260ms cubic-bezier(0.2,0.8,0.2,1)" }}
+        style={{ transform: `translateX(${x}px)`, transition: g.current ? "none" : "transform var(--dur-quick) var(--spring-quick)" }}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}

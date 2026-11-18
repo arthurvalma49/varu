@@ -319,7 +319,7 @@ export default function App() {
           {toast.undo && (
             <button
               type="button"
-              className="min-h-10 px-4 rounded-full font-semibold text-[15px] text-[#0a84ff] cursor-pointer active:opacity-60"
+              className="tap min-h-10 px-4 rounded-full font-semibold text-[15px] text-[#0a84ff] cursor-pointer"
               onClick={() => {
                 toast.undo!();
                 setToast(null);
@@ -335,7 +335,7 @@ export default function App() {
         <div className="glass pointer-events-auto max-w-[340px] mx-auto rounded-full p-1 grid grid-cols-3 relative">
           <span
             aria-hidden
-            className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] rounded-full bg-surface-2 transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none"
+            className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] rounded-full bg-surface-2 transition-transform duration-(--dur-snappy) ease-(--spring-snappy) motion-reduce:transition-none"
             style={{ transform: `translateX(${TABS.findIndex((t) => t.id === tab) * 100}%)` }}
           />
           {TABS.map((t) => {
@@ -346,7 +346,7 @@ export default function App() {
                 type="button"
                 aria-current={on ? "page" : undefined}
                 onClick={() => go(t.id)}
-                className={`relative flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full cursor-pointer transition-colors duration-200 ${
+                className={`tab-btn relative flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full cursor-pointer transition-colors duration-200 ${
                   on ? "text-accent" : "text-ink"
                 }`}
               >

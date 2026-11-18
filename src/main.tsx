@@ -13,6 +13,9 @@ if ("serviceWorker" in navigator) {
   }
 }
 
+// iOS Safari only applies :active (touch highlight) when a touch listener exists.
+document.addEventListener("touchstart", () => {}, { passive: true });
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
