@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { inWindow, lessonTimes, lessonsOn, missableOn, preview, segmentFor, statusOf, summary, withCancelled } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow } from "../core/types";
 import { newId } from "../store";
-import { Button, Check, DateField, Icon, Pill, Row, Section, Segmented, Switch, WD_LONG, cap, fmtDate, joinEt, leftLabel, pct, tunde } from "./kit";
+import { Button, Check, DateField, DateRangeField, Icon, Pill, Row, Section, Segmented, Switch, WD_LONG, cap, fmtDate, joinEt, leftLabel, pct, tunde } from "./kit";
 
 type DayPick = "today" | "tomorrow" | "other";
 
@@ -68,6 +68,9 @@ export function LogAbsence({
     for (const [id, n] of Object.entries(extra)) if (n > 0) s[id] = (s[id] ?? 0) + n;
     return s;
   }, [blocks, unchecked, extra, partial]);
+
+  // Days with nothing to miss (weekends, holidays, self-study, outside the period) are greyed in the calendar.
+  const noSchool = useCallback((d: string) => missableOn(setup, d).length === 0, [setup]);
 
   // Several days: every missable lesson of each school day in the range, one entry per day.
   const rangeDays = useMemo(() => {
@@ -183,16 +186,31 @@ export function LogAbsence({
             ]}
           />
         </div>
-        <DateField
-          label={multi ? "Alates" : cap(WD_LONG[wd])}
-          value={date}
-          onChange={(v) => {
-            setPick(v === now ? "today" : v === tomorrow ? "tomorrow" : "other");
-            changeDate(v);
-            if (v > until) setUntil(v);
-          }}
-        />
-        {multi && <DateField label="Kuni" min={date} value={until} onChange={setUntil} />}
+        {multi ? (
+          <DateRangeField
+            label="Päevad"
+            start={date}
+            end={until}
+            defaultOpen
+            isOff={noSchool}
+            onChange={(a, b) => {
+              setPick(a === now ? "today" : a === tomorrow ? "tomorrow" : "other");
+              changeDate(a);
+              setUntil(b);
+            }}
+          />
+        ) : (
+          <DateField
+            label={cap(WD_LONG[wd])}
+            value={date}
+            isOff={noSchool}
+            onChange={(v) => {
+              setPick(v === now ? "today" : v === tomorrow ? "tomorrow" : "other");
+              changeDate(v);
+              if (v > until) setUntil(v);
+            }}
+          />
+        )}
         {!cancelMode && (
           <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
             <span>Mitu päeva</span>

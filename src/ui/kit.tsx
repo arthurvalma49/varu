@@ -284,25 +284,28 @@ export function Segmented<T extends string>({
 /** iOS switch. */
 export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => {
-        haptic();
-        onChange(!checked);
-      }}
-      className={`group relative shrink-0 w-[51px] h-[31px] rounded-full cursor-pointer transition-colors duration-300 disabled:opacity-40 ${checked ? "bg-ok-fill" : "bg-surface-2"}`}
+    <label
+      className={`group relative shrink-0 w-[51px] h-[31px] rounded-full cursor-pointer transition-colors duration-300 has-[:disabled]:opacity-40 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${checked ? "bg-ok-fill" : "bg-surface-2"}`}
     >
+      {/* A real iOS switch input takes the tap, so Safari plays the system haptic itself. */}
+      <input
+        type="checkbox"
+        // @ts-expect-error: Safari's native switch attribute
+        switch=""
+        role="switch"
+        aria-label={label}
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="absolute inset-0 m-0 size-full opacity-0 cursor-pointer appearance-none"
+      />
       {/* Like UISwitch: the knob stretches while held, then springs across. */}
       <span
-        className={`absolute top-[2px] left-[2px] h-[27px] w-[27px] group-active:w-[34px] rounded-full bg-white shadow-[0_3px_8px_rgb(0_0_0/0.15),0_3px_1px_rgb(0_0_0/0.06)] transition-[transform,width] duration-(--dur-snappy) ease-(--spring-snappy) motion-reduce:transition-none ${
+        className={`pointer-events-none absolute top-[2px] left-[2px] h-[27px] w-[27px] group-active:w-[34px] rounded-full bg-white shadow-[0_3px_8px_rgb(0_0_0/0.15),0_3px_1px_rgb(0_0_0/0.06)] transition-[transform,width] duration-(--dur-snappy) ease-(--spring-snappy) motion-reduce:transition-none ${
           checked ? "translate-x-5 group-active:translate-x-[13px]" : ""
         }`}
       />
-    </button>
+    </label>
   );
 }
 
@@ -706,6 +709,7 @@ export function DateField({
   max,
   placeholder = "Vali kuupäev",
   trailing,
+  isOff,
 }: {
   label?: ReactNode;
   value: string;
@@ -714,6 +718,7 @@ export function DateField({
   max?: string;
   placeholder?: string;
   trailing?: ReactNode;
+  isOff?: (iso: string) => boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { mounted, shown } = usePresence(open, 450);
@@ -745,6 +750,7 @@ export function DateField({
               value={shownValue}
               min={min}
               max={max}
+              isOff={isOff}
               onPick={(v) => {
                 onChange(v);
                 setOpen(false);
@@ -758,17 +764,63 @@ export function DateField({
 }
 
 const CAL_WD = ["E", "T", "K", "N", "R", "L", "P"];
+const isWeekend = (iso: string) => {
+  const d = new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))).getDay();
+  return d === 0 || d === 6;
+};
 
-function Calendar({ value, min, max, onPick }: { value: string; min?: string; max?: string; onPick: (v: string) => void }) {
+/**
+ * Month calendar. Single mode picks one day. Range mode: tap the first and last day, or press
+ * and drag across days. `isOff` greys out days without school (they still can be selected).
+ */
+function Calendar({
+  value,
+  end,
+  min,
+  max,
+  isOff = isWeekend,
+  onPick,
+  onRange,
+}: {
+  value: string;
+  end?: string;
+  min?: string;
+  max?: string;
+  isOff?: (iso: string) => boolean;
+  onPick?: (v: string) => void;
+  onRange?: (start: string, end: string, done: boolean) => void;
+}) {
+  const range = !!onRange;
   const today = todayIso();
   const start = value || (min && min > today ? min : max && max < today ? max : today);
   const [ym, setYm] = useState(() => ({ y: Number(start.slice(0, 4)), m: Number(start.slice(5, 7)) - 1 }));
+  // Range: after the first tap we wait for the second one.
+  const pending = useRef(false);
+  const drag = useRef<{ anchor: string; moved: boolean } | null>(null);
+  const justDragged = useRef(false);
   const first = new Date(ym.y, ym.m, 1);
   const lead = (first.getDay() + 6) % 7; // Monday first
   const days = new Date(ym.y, ym.m + 1, 0).getDate();
   const step = (k: number) => setYm(({ y, m }) => ({ y: m + k < 0 ? y - 1 : m + k > 11 ? y + 1 : y, m: (m + k + 12) % 12 }));
   const canPrev = !min || isoOf(ym.y, ym.m, 1) > min;
   const canNext = !max || isoOf(ym.y, ym.m, days) < max;
+  const allowed = (iso: string) => !((min && iso < min) || (max && iso > max));
+  const lo = value;
+  const hi = range ? end || value : value;
+  const dayAt = (x: number, y: number) => (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>("[data-iso]")?.dataset.iso;
+
+  const tap = (iso: string) => {
+    haptic();
+    if (!range) return onPick?.(iso);
+    if (!pending.current || iso < lo) {
+      pending.current = true;
+      onRange!(iso, iso, false);
+    } else {
+      pending.current = false;
+      onRange!(lo, iso, true);
+    }
+  };
+
   return (
     <div className="px-3 pb-3 pt-1">
       <div className="flex items-center justify-between pl-2 pb-1">
@@ -789,28 +841,92 @@ function Calendar({ value, min, max, onPick }: { value: string; min?: string; ma
           <span key={d}>{d}</span>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-y-0.5" role="grid" aria-label={`${cap(MON_LONG[ym.m])} ${ym.y}`}>
+      <div
+        className={`grid grid-cols-7 gap-y-0.5 select-none ${range ? "touch-none" : ""}`}
+        role="grid"
+        aria-label={`${cap(MON_LONG[ym.m])} ${ym.y}`}
+        onPointerDown={(e) => {
+          if (!range) return;
+          const iso = dayAt(e.clientX, e.clientY);
+          if (!iso || !allowed(iso)) return;
+          drag.current = { anchor: iso, moved: false };
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const iso = dayAt(e.clientX, e.clientY);
+          if (!iso || !allowed(iso) || (!d.moved && iso === d.anchor)) return;
+          if (!d.moved) {
+            haptic();
+            // Keep following the finger/cursor across the whole grid once a drag starts.
+            (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+          }
+          d.moved = true;
+          const [a, b] = iso < d.anchor ? [iso, d.anchor] : [d.anchor, iso];
+          if (a !== lo || b !== hi) onRange!(a, b, false);
+        }}
+        onPointerUp={() => {
+          const d = drag.current;
+          drag.current = null;
+          if (d?.moved) {
+            pending.current = false;
+            justDragged.current = true;
+            setTimeout(() => (justDragged.current = false), 0);
+            haptic();
+            onRange!(lo, hi, true);
+          }
+        }}
+        onPointerCancel={() => (drag.current = null)}
+      >
         {Array.from({ length: lead }, (_, i) => (
           <span key={`l${i}`} />
         ))}
         {Array.from({ length: days }, (_, i) => {
           const iso = isoOf(ym.y, ym.m, i + 1);
-          const off = (!!min && iso < min) || (!!max && iso > max);
-          const sel = iso === value;
+          const off = !allowed(iso);
+          const free = !off && isOff(iso);
+          const isStart = iso === lo;
+          const isEnd = range && iso === hi;
+          const sel = isStart || isEnd;
+          const inside = range && lo && hi > lo && iso > lo && iso < hi;
           const isToday = iso === today;
+          const band = "var(--accent-soft)";
+          const bg =
+            range && lo && hi > lo
+              ? inside
+                ? band
+                : isStart
+                  ? `linear-gradient(90deg, transparent 50%, ${band} 50%)`
+                  : isEnd
+                    ? `linear-gradient(90deg, ${band} 50%, transparent 50%)`
+                    : undefined
+              : undefined;
           return (
             <button
               key={iso}
               type="button"
+              data-iso={iso}
               disabled={off}
-              aria-pressed={sel}
-              aria-label={fmtDate(iso, true)}
-              onClick={() => onPick(iso)}
+              aria-pressed={sel || !!inside}
+              aria-label={`${fmtDate(iso, true)}${free ? ", koolivaba" : ""}`}
+              onClick={() => {
+                if (justDragged.current) return;
+                tap(iso);
+              }}
               className="group grid place-items-center h-11 cursor-pointer disabled:cursor-default"
+              style={{ background: bg }}
             >
               <span
                 className={`num size-10 grid place-items-center rounded-full text-[19px] transition-colors duration-150 ${
-                  sel ? "bg-accent text-accent-ink font-semibold" : off ? "text-faint" : isToday ? "text-accent font-semibold group-active:bg-surface-2" : "group-active:bg-surface-2"
+                  sel
+                    ? `bg-accent text-accent-ink font-semibold ${free ? "opacity-70" : ""}`
+                    : off
+                      ? "text-faint opacity-50"
+                      : free
+                        ? "text-faint"
+                        : isToday
+                          ? "text-accent font-semibold group-active:bg-surface-2"
+                          : "group-active:bg-surface-2"
                 }`}
               >
                 {i + 1}
@@ -818,6 +934,62 @@ function Calendar({ value, min, max, onPick }: { value: string; min?: string; ma
             </button>
           );
         })}
+      </div>
+      <div className="flex items-center gap-2 pl-2 pt-2 text-[13px] text-muted">
+        <span className="num text-faint font-semibold">12</span>
+        <span>hall = koolivaba päev, ei lähe arvesse</span>
+      </div>
+      {range && <div className="pl-2 pt-1 text-[13px] text-muted">Puuduta esimest ja viimast päeva või vea sõrmega üle päevade.</div>}
+    </div>
+  );
+}
+
+/** A day range in one calendar: tap first and last day, or drag across them. */
+export function DateRangeField({
+  label,
+  start,
+  end,
+  onChange,
+  isOff,
+  defaultOpen,
+}: {
+  label: ReactNode;
+  start: string;
+  end: string;
+  onChange: (start: string, end: string) => void;
+  isOff?: (iso: string) => boolean;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  const { mounted, shown } = usePresence(open, 450);
+  const text = start === end ? fmtDate(start, true) : `${fmtDate(start)} – ${fmtDate(end, start.slice(0, 4) !== end.slice(0, 4))}`;
+  return (
+    <div className="cell">
+      <div className="flex items-center justify-between gap-3 px-5 min-h-[52px]">
+        <span className="min-w-0">{label}</span>
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className={`tap num rounded-full px-3 py-1.5 text-[17px] cursor-pointer transition-colors duration-200 ${open ? "bg-accent-soft text-accent" : "bg-surface-2 text-ink"}`}
+        >
+          {text}
+        </button>
+      </div>
+      <div className="grid transition-[grid-template-rows] duration-(--dur-smooth) ease-(--spring-smooth) motion-reduce:transition-none" style={{ gridTemplateRows: shown ? "1fr" : "0fr" }}>
+        <div className="min-h-0 overflow-hidden">
+          {mounted && (
+            <Calendar
+              value={start}
+              end={end}
+              isOff={isOff}
+              onRange={(a, b, done) => {
+                onChange(a, b);
+                if (done && a !== b) setTimeout(() => setOpen(false), 350);
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
