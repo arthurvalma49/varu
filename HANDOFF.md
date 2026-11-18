@@ -31,7 +31,8 @@ Done and working:
 - Guided setup: school and class, tap subjects, build each weekday by tapping subjects in order, starting absences. The draft survives a reload. Classmates can paste a share code or open a link instead.
 - Overview: verdict sentence for the next free school day, every subject at 0 named with its next lesson date, one-tap "Täna puudun", grouped subject list, advisory subjects ("Vähem tähtis") never headline.
 - Lisa: Täna/Homme chips, a sticky verdict and save bar, a red action when saving goes over the limit. Ajalugu: edit, and delete with undo. Seaded: the same tap-to-build timetable editor, holidays shown as ranges plus a one-tap national-breaks button.
-- 20 vitest tests. `npm test` and `npm run build` pass.
+- EduPage import (`src/core/edupage.ts`, UI `src/ui/EduImport.tsx`, proxy `api/edupage.js` as a Vercel function because EduPage sends no CORS headers). RAM is at ramkool.edupage.org; at least 62 Estonian schools publish timetables there. The import reads every timetable published in the grading window (RAM: I and II periood) as separate periods, maps "(i)" subjects to iseõpe, and asks the student for their group in each split. Tested against real fixtures (Pae 9.a, RAM 9.b). EduPage's endpoints are unofficial and may change.
+- 26 vitest tests. `npm test` and `npm run build` pass.
 
 Known gaps:
 - The paste importer has never been tested on a real Stuudium/eKool copy.

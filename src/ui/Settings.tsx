@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { totals } from "../core/calc";
+import { segmentFor, totals } from "../core/calc";
+import { today } from "../core/dates";
 import { isValidISO } from "../core/dates";
 import { SCHOOLS } from "../core/schools";
 import { breakDays } from "../core/setup";
@@ -8,14 +9,17 @@ import { emptyTimetable, slug } from "../core/templates";
 import type { AppData, Setup } from "../core/types";
 import type { Store } from "../store";
 import { Button, Check, Icon, LargeTitle, NavBar, Row, Section, Segmented, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
+import { eduSegments } from "../core/edupage";
+import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
 
-type Page = "root" | "rule" | "window" | "subjects" | "timetable" | "holidays" | "share" | "backup";
+type Page = "root" | "rule" | "window" | "subjects" | "timetable" | "edupage" | "holidays" | "share" | "backup";
 const TITLES: Record<Exclude<Page, "root">, string> = {
   rule: "Kool ja reegel",
   window: "Periood ja klass",
   subjects: "Ained",
   timetable: "Tunniplaan",
+  edupage: "Impordi EduPage'ist",
   holidays: "Vabad päevad",
   share: "Jaga klassiga",
   backup: "Varukoopia",
@@ -83,7 +87,30 @@ export function Settings({ store }: { store: Store }) {
       {page === "rule" && <RulePage setup={setup} updateSetup={updateSetup} />}
       {page === "window" && <WindowPage setup={setup} updateSetup={updateSetup} />}
       {page === "subjects" && <SubjectsPage setup={setup} updateSetup={updateSetup} />}
-      {page === "timetable" && <TimetablePage setup={setup} updateSetup={updateSetup} />}
+      {page === "timetable" && <TimetablePage setup={setup} updateSetup={updateSetup} onEdupage={() => open("edupage")} />}
+      {page === "edupage" && (
+        <EduImport
+          actionLabel="Asenda tunniplaanid"
+          onResult={(r) => {
+            updateSetup((d) => {
+              const { segments, subjects } = eduSegments(r.periods, r.className, r.groupNames, d.windowStart, d.windowEnd);
+              for (const sub of subjects.length ? subjects : r.subjects) if (!d.subjects.some((x) => x.id === sub.id)) d.subjects.push({ id: sub.id, name: sub.name, tracked: true });
+              if (segments.length) {
+                d.segments = segments;
+                d.baseline = {};
+              } else {
+                const seg = segmentFor(d, today()) ?? d.segments[d.segments.length - 1];
+                if (seg) {
+                  seg.timetable = r.timetable;
+                  seg.assumed = false;
+                }
+              }
+            });
+            open("timetable");
+            setMsg("Tunniplaan imporditud. Vaata see üle.");
+          }}
+        />
+      )}
       {page === "holidays" && <HolidaysPage setup={setup} updateSetup={updateSetup} />}
       {page === "share" && <SharePage data={data} replaceAll={replaceAll} setMsg={setMsg} />}
       {page === "backup" && <BackupPage data={data} replaceAll={replaceAll} setMsg={setMsg} />}
@@ -328,9 +355,14 @@ function SubjectsPage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }
   );
 }
 
-function TimetablePage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }) {
+function TimetablePage({ setup, updateSetup, onEdupage }: { setup: Setup; updateSetup: Upd; onEdupage: () => void }) {
   return (
     <>
+      <Section footer="Kui kool avaldab tunniplaani edupage.org-is, loeb sealt kõik selle perioodi tunniplaanid ja asendab praegused.">
+        <Row onClick={onEdupage} chevron>
+          <span className="text-accent">Impordi EduPage'ist</span>
+        </Row>
+      </Section>
       {setup.segments.map((seg, si) => {
         const others = setup.segments.filter((_, i) => i !== si);
         const upd = (fn: (s: Setup["segments"][number]) => void) => updateSetup((d) => fn(d.segments[si]));

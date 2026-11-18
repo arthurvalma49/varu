@@ -3,6 +3,9 @@ import { dayCapacity, dayVerdict, maxAllowed, nextLesson, nextSchoolDay, plannin
 import { parsePaste, toAbsences } from "./importer";
 import { decodeSetup, encodeSetup } from "./share";
 import { appendLesson, breakDays, buildSetup, cycleLesson, defaultWindow, removeLesson, startingAbsence } from "./setup";
+import { eduDivisions, eduSegments, eduTimetable, edupageSchool, picksByName, ttRange, type EduData, type EduPeriod } from "./edupage";
+import ramFixture from "./fixtures/edupage-ram-9b.json";
+import paeFixture from "./fixtures/edupage-pae-9a.json";
 import { migrateSetup, ram9bTemplate } from "./templates";
 import type { Rule } from "./types";
 
@@ -189,5 +192,73 @@ describe("guided setup", () => {
     expect(a.lessons).toEqual({ matemaatika: 4 });
     expect(summary(setup, [a], "2026-11-18").find((r) => r.subject.id === "matemaatika")!.absent).toBe(4);
     expect(startingAbsence(setup, { keemia: 0 }, "")).toBeNull();
+  });
+});
+
+describe("EduPage import (real public data: Tallinna Pae Gümnaasium 9.a, Nov 2026)", () => {
+  const d = paeFixture as EduData;
+  const cls = d.classes[0].id;
+
+  it("reads a school id from a link, a domain or a bare name", () => {
+    expect(edupageSchool("https://pae.edupage.org/timetable/view.php?class=-188")).toBe("pae");
+    expect(edupageSchool("pae.edupage.org")).toBe("pae");
+    expect(edupageSchool(" Pae ")).toBe("pae");
+    expect(edupageSchool("../evil")).toBeNull();
+  });
+
+  it("offers the group splits the student must choose from", () => {
+    const names = eduDivisions(d, cls).map((v) => v.groups.map((g) => g.name).sort().join("/"));
+    expect(names).toContain("Boys/Girls");
+    expect(names).toContain("Inglise 1/Inglise 2");
+    expect(names).toContain("Eesti 1/Eesti 2");
+  });
+
+  it("builds one student's week: group lessons only once, double lessons merged", () => {
+    const divs = eduDivisions(d, cls);
+    const picks = Object.fromEntries(divs.map((v) => [v.id, v.groups[0].id]));
+    const r = eduTimetable(d, cls, picks);
+    const all = Object.values(r.timetable).flat();
+    // Biology is one 2-period card on Wednesday (periods 5-6).
+    expect(r.timetable[3].find((l) => l.subjectId === "bioloogia")).toMatchObject({ count: 2, slot: "5–6" });
+    // Maths: 4 single lessons a week, whole class.
+    expect(all.filter((l) => l.subjectId === "matemaatika").reduce((s, l) => s + l.count, 0)).toBe(4);
+    // Only one English group is attended, so English is 3 lessons, not 6.
+    expect(all.filter((l) => l.subjectId === "inglise-keel").reduce((s, l) => s + l.count, 0)).toBe(3);
+    // PE: picking one of Boys/Girls gives one double lesson, not two.
+    expect(all.filter((l) => l.subjectId === "kehaline-kasvatus").reduce((s, l) => s + l.count, 0)).toBe(2);
+    expect(r.subjects.find((s) => s.id === "matemaatika")?.name).toBe("Matemaatika");
+    expect(r.skippedAlternating).toBe(0);
+  });
+});
+
+describe("EduPage import (real public data: Rocca al Mare Kool 9.b, I and II periood 2026/27)", () => {
+  const periods = ramFixture as unknown as EduPeriod[];
+
+  it("reads period dates from timetable titles", () => {
+    expect(ttRange(periods[1].info)).toEqual({ start: "2026-11-02", end: "2026-12-20" });
+    expect(ttRange({ tt_num: "1", text: "III periood 2020 (18. 12. 2019 - 22. 02. 2020)" })).toEqual({ start: "2019-12-18", end: "2020-02-22" });
+  });
+
+  it("matches the hand-made 9.b template's II periood, with (i) lessons as self-study", () => {
+    const d = periods[1].data as EduData;
+    const r = eduTimetable(d, d.classes[0].id, picksByName(d, d.classes[0].id, []));
+    const tpl = ram9bTemplate().segments[0].timetable;
+    const show = (t: typeof tpl, wd: 1 | 2 | 3 | 4 | 5) => t[wd].map((l) => `${l.slot} ${l.subjectId}${l.selfStudy ? " (i)" : ""}`);
+    for (const wd of [1, 2, 3] as const) expect(show(r.timetable, wd)).toEqual(show(tpl, wd));
+    expect(r.subjects.some((s) => /\(i\)/.test(s.name))).toBe(false);
+  });
+
+  it("rebuilds the whole half-year from every published period", () => {
+    const r = eduSegments(periods, "9.b", [], "2026-09-01", "2027-01-25");
+    expect(r.segments.map((s) => [s.start, s.end, !!s.assumed])).toEqual([
+      ["2026-09-01", "2026-10-20", false],
+      ["2026-11-02", "2026-12-20", false],
+      ["2026-12-21", "2027-01-25", true],
+    ]);
+    const setup = { ...ram9bTemplate(), baseline: {}, segments: r.segments, holidays: breakDays("2026-09-01", "2027-01-25") };
+    const T = totals(setup);
+    // Within a few lessons of the original tool's hand count (school events are not in timetables).
+    expect(T["fuusika"]).toBe(34);
+    expect(Math.abs(T["matemaatika"] - 85)).toBeLessThanOrEqual(4);
   });
 });

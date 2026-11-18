@@ -3,15 +3,17 @@ import { maxAllowed } from "../core/calc";
 import { isValidISO } from "../core/dates";
 import { SCHOOLS } from "../core/schools";
 import { COMMON_SUBJECTS, buildSetup, defaultWindow, startingAbsence, subjectId, type SetupDraft } from "../core/setup";
+import { eduSegments } from "../core/edupage";
 import { decodeSetup } from "../core/share";
 import { emptyTimetable, ram9bTemplate } from "../core/templates";
 import type { Absence, Setup } from "../core/types";
 import { Button, Check, Icon, NavBar, Row, Section, Stepper, Switch, fmtLimit, limitPhrase, tunde, type IconName } from "./kit";
+import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
 
 const DRAFT_KEY = "varu:draft";
 const INTRO_KEY = "varu:intro-seen";
-type Step = "intro" | "rule" | "start" | "school" | "subjects" | "timetable" | "start-counts";
+type Step = "intro" | "rule" | "start" | "edupage" | "school" | "subjects" | "timetable" | "start-counts";
 const SETUP_STEPS: Step[] = ["school", "subjects", "timetable", "start-counts"];
 const STEP_TITLE: Partial<Record<Step, string>> = { school: "Kool ja klass", subjects: "Ained", timetable: "Tunniplaan", "start-counts": "Algseis" };
 
@@ -60,6 +62,7 @@ export function Onboarding({
 }) {
   const [{ step, draft }, setState] = useState(() => initial(today));
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [eduInitial, setEduInitial] = useState("");
   const setStep = (s: Step) => {
     if (s === "start") store.set(INTRO_KEY, "1");
     setState((v) => ({ ...v, step: s }));
@@ -104,7 +107,59 @@ export function Onboarding({
 
   if (step === "rule") return <RuleIntro onNext={() => setStep("start")} onBack={() => setStep("intro")} />;
 
-  if (step === "start") return <Start onRam={() => finish(ram9bTemplate())} onCode={(s) => finish(s)} onCustom={() => setStep("school")} onIntro={() => setStep("intro")} />;
+  if (step === "start")
+    return (
+      <Start
+        onRam={() => {
+          setEduInitial("ramkool");
+          setStep("edupage");
+        }}
+        onRam9b={() => finish(ram9bTemplate())}
+        onCode={(s) => finish(s)}
+        onCustom={() => setStep("school")}
+        onEdupage={() => {
+          setEduInitial("");
+          setStep("edupage");
+        }}
+        onIntro={() => setStep("intro")}
+      />
+    );
+
+  if (step === "edupage")
+    return (
+      <div className="flex flex-col gap-7 pb-10">
+        <NavBar title="EduPage" onBack={() => setStep("start")} />
+        <Lead title="Impordi EduPage'ist" text="Kui sinu kool avaldab tunniplaani edupage.org-is, tõmban selle sealt. Siis vali klass ja oma rühmad." />
+        <EduImport
+          actionLabel="Edasi"
+          initial={eduInitial}
+          onResult={(r) => {
+            const preset = SCHOOLS.find((x) => x.name === r.schoolName);
+            const w = defaultWindow(today, preset?.id ?? "custom");
+            const { segments, subjects } = eduSegments(r.periods, r.className, r.groupNames, w.start, w.end);
+            const real = segments.filter((sg) => !sg.assumed);
+            const current = real.find((sg) => today >= sg.start && today <= sg.end) ?? real[real.length - 1] ?? null;
+            setState({
+              step: "school",
+              draft: {
+                ...draft,
+                schoolId: preset?.id ?? "custom",
+                schoolName: preset ? "" : r.schoolName,
+                className: r.className,
+                window: w,
+                timetableFrom: w.start,
+                subjectNames: (subjects.length ? subjects : r.subjects).map((x) => x.name),
+                timetable: current?.timetable ?? r.timetable,
+                segments: segments.length ? segments : undefined,
+                currentSegId: current?.id,
+                baseline: {},
+              },
+            });
+            window.scrollTo({ top: 0 });
+          }}
+        />
+      </div>
+    );
 
   const idx = SETUP_STEPS.indexOf(step);
   const back = () => setStep(idx > 0 ? SETUP_STEPS[idx - 1] : "start");
@@ -175,6 +230,18 @@ export function Onboarding({
           <div className="bg-surface rounded-[26px] p-4">
             <WeekEditor subjects={subjects} timetable={draft.timetable} onChange={(timetable) => patch({ timetable })} />
           </div>
+          {draft.segments?.length ? (
+            <Section title="Perioodid EduPage'ist" footer="Ülal muudad praegust perioodi. Teiste perioodide tunnid tulevad kooli tunniplaanist. Ühekordseid üritusi (nt ekskursioon) tunniplaan ei tea, need lisa vabade päevade alla.">
+              {draft.segments.map((sg) => (
+                <Row key={sg.id} detail={<span className="num text-[15px]">{fmtShort(sg.start)} – {fmtShort(sg.end)}</span>}>
+                  <span className={sg.id === draft.currentSegId ? "font-semibold" : sg.assumed ? "text-muted" : ""}>
+                    {sg.name}
+                    {sg.assumed ? " (eeldatud)" : ""}
+                  </span>
+                </Row>
+              ))}
+            </Section>
+          ) : (
           <Section footer={lateStart ? "Järgmisena küsin, mitu tundi igas aines enne seda toimus." : "Näiteks kui periood vahetus ja tunniplaan muutus."}>
             <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
               <span>Tunniplaan muutus perioodi sees</span>
@@ -198,6 +265,7 @@ export function Onboarding({
               </label>
             )}
           </Section>
+          )}
         </>
       )}
 
@@ -361,7 +429,21 @@ function Fact({ children }: { children: ReactNode }) {
   );
 }
 
-function Start({ onRam, onCode, onCustom, onIntro }: { onRam: () => void; onCode: (s: Setup) => void; onCustom: () => void; onIntro: () => void }) {
+function Start({
+  onRam,
+  onRam9b,
+  onCode,
+  onCustom,
+  onEdupage,
+  onIntro,
+}: {
+  onRam: () => void;
+  onRam9b: () => void;
+  onCode: (s: Setup) => void;
+  onCustom: () => void;
+  onEdupage: () => void;
+  onIntro: () => void;
+}) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   return (
@@ -401,20 +483,33 @@ function Start({ onRam, onCode, onCustom, onIntro }: { onRam: () => void; onCode
         </div>
       </Section>
 
-      <Section title="Või seadista ise">
-        <Row onClick={onCustom} chevron>
-          <div>Seadista oma klass</div>
-          <div className="text-[13px] text-muted">Kool, ained ja tunniplaan. Umbes kaks minutit.</div>
-        </Row>
+      <Section title="Rocca al Mare Kool">
         <Row onClick={onRam} chevron>
-          <div>Rocca al Mare Kool · 9.b</div>
-          <div className="text-[13px] text-muted">Valmis tunniplaan, I poolaasta 2026/27</div>
+          <div>RAM, iga klass</div>
+          <div className="text-[13px] text-muted">Tunniplaan otse kooli EduPage'ist. Vali klass ja rühmad.</div>
         </Row>
       </Section>
 
-      <Button variant="quiet" className="self-start" onClick={onIntro}>
-        Kuidas see töötab?
-      </Button>
+      <Section title="Muu kool">
+        <Row onClick={onEdupage} chevron>
+          <div>Impordi EduPage'ist</div>
+          <div className="text-[13px] text-muted">Kui kool avaldab tunniplaani edupage.org-is. Umbes 30 sekundit.</div>
+        </Row>
+        <Row onClick={onCustom} chevron>
+          <div>Seadista käsitsi</div>
+          <div className="text-[13px] text-muted">Kool, ained ja tunniplaan. Umbes kaks minutit.</div>
+        </Row>
+
+      </Section>
+
+      <div className="flex flex-wrap gap-x-2">
+        <Button variant="quiet" onClick={onIntro}>
+          Kuidas see töötab?
+        </Button>
+        <Button variant="quiet" className="text-muted" onClick={onRam9b}>
+          RAM 9.b näidis
+        </Button>
+      </div>
     </div>
   );
 }
@@ -486,6 +581,8 @@ function SchoolStep({ draft, today, patch }: { draft: SetupDraft; today: string;
     </>
   );
 }
+
+const fmtShort = (ds: string) => `${Number(ds.slice(8, 10))}.${Number(ds.slice(5, 7))}.`;
 
 function Lead({ title, text }: { title: string; text: string }) {
   return (

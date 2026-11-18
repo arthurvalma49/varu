@@ -2,7 +2,7 @@
 import { eachDay, isSchoolWeekday, weekdayOf } from "./dates";
 import { SCHOOLS } from "./schools";
 import { slug } from "./templates";
-import type { Absence, ISODate, Lesson, Setup, Subject, Timetable, Weekday } from "./types";
+import type { Absence, ISODate, Lesson, Segment, Setup, Subject, Timetable, Weekday } from "./types";
 
 /** Subjects most Estonian põhikool/gümnaasium timetables use, in a natural order. */
 export const COMMON_SUBJECTS = [
@@ -117,6 +117,9 @@ export interface SetupDraft {
   /** Date the timetable started. Lessons before it are counted from `baseline`. */
   timetableFrom: ISODate;
   baseline: Record<string, number>;
+  /** Periods imported from EduPage. `timetable` above is the editable copy of `currentSegId`. */
+  segments?: Segment[];
+  currentSegId?: string;
 }
 
 export function subjectId(name: string) {
@@ -136,8 +139,8 @@ export function buildSetup(d: SetupDraft): Setup {
       ...(name === "Klassijuhataja tund" ? { advisory: true, note: "Hinnet ei saa, seega puudumise piir ei pruugi kehtida." } : {}),
     });
   }
-  const from = d.timetableFrom > d.window.start ? d.timetableFrom : d.window.start;
-  const used = new Set(Object.values(d.timetable).flat().map((l) => l.subjectId));
+  const from = !d.segments?.length && d.timetableFrom > d.window.start ? d.timetableFrom : d.window.start;
+  const used = new Set([d.timetable, ...(d.segments ?? []).map((sg) => sg.timetable)].flatMap((t) => Object.values(t).flat().map((l) => l.subjectId)));
   const baseline: Record<string, number> = {};
   if (from > d.window.start) for (const s of subjects) if (d.baseline[s.id]) baseline[s.id] = d.baseline[s.id];
   return {
@@ -152,7 +155,9 @@ export function buildSetup(d: SetupDraft): Setup {
     subjects: subjects.filter((s) => used.has(s.id) || baseline[s.id]),
     baseline,
     ...(from > d.window.start ? { baselineLabel: `Enne ${from} toimunud tunnid, käsitsi loetud` } : {}),
-    segments: [{ id: "s1", name: "Tunniplaan", start: from, end: d.window.end, timetable: structuredClone(d.timetable) }],
+    segments: d.segments?.length
+      ? d.segments.map((sg) => (sg.id === d.currentSegId ? { ...sg, timetable: structuredClone(d.timetable) } : structuredClone(sg)))
+      : [{ id: "s1", name: "Tunniplaan", start: from, end: d.window.end, timetable: structuredClone(d.timetable) }],
     holidays: breakDays(d.window.start, d.window.end),
   };
 }
