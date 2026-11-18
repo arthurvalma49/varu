@@ -120,6 +120,8 @@ export interface SetupDraft {
   /** Periods imported from EduPage. `timetable` above is the editable copy of `currentSegId`. */
   segments?: Segment[];
   currentSegId?: string;
+  /** How the timetable was made: imported from EduPage (default) or built by hand. */
+  source?: "edupage" | "manual";
 }
 
 export function subjectId(name: string) {

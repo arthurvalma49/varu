@@ -25,6 +25,14 @@ const ERRORS: Record<string, string> = {
   offline: "Internetiühendus puudub. Import vajab internetti.",
 };
 
+/** "B-keel 1", "B-keel 2" -> "B-keel"; falls back to a generic title. */
+function groupTitle(names: string[]) {
+  let p = names[0] ?? "";
+  for (const n of names) while (!n.startsWith(p)) p = p.slice(0, -1);
+  p = p.replace(/[\s\d.\-–]+$/, "").trim();
+  return p.length >= 2 ? `Sinu rühm: ${p}` : "Sinu rühm";
+}
+
 async function getJson<T>(url: string): Promise<T> {
   let r: Response;
   try {
@@ -180,7 +188,7 @@ export function EduImport({
           </Section>
 
           {divisions.map((v) => (
-            <Section key={v.id} title="Sinu rühm">
+            <Section key={v.id} title={groupTitle(v.groups.map((g) => g.name))}>
               {v.groups.map((g) => (
                 <button
                   key={g.id}

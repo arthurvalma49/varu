@@ -13,9 +13,11 @@ import { WeekEditor } from "./WeekEditor";
 
 const DRAFT_KEY = "varu:draft";
 const INTRO_KEY = "varu:intro-seen";
-type Step = "intro" | "rule" | "start" | "edupage" | "school" | "subjects" | "timetable" | "start-counts";
-const SETUP_STEPS: Step[] = ["school", "subjects", "timetable", "start-counts"];
-const STEP_TITLE: Partial<Record<Step, string>> = { school: "Kool ja klass", subjects: "Ained", timetable: "Tunniplaan", "start-counts": "Algseis" };
+type Step = "intro" | "rule" | "start" | "school" | "source" | "subjects" | "timetable" | "start-counts";
+const SETUP_STEPS: Step[] = ["school", "source", "subjects", "timetable", "start-counts"];
+/** Import skips choosing subjects: they come with the timetable. */
+const flowFor = (source: SetupDraft["source"]): Step[] => (source === "manual" ? SETUP_STEPS : SETUP_STEPS.filter((x) => x !== "subjects"));
+const STEP_TITLE: Partial<Record<Step, string>> = { school: "Kool ja klass", source: "Tunniplaan", subjects: "Ained", timetable: "Tunniplaan", "start-counts": "Algseis" };
 
 const store = {
   get(k: string) {
@@ -62,7 +64,6 @@ export function Onboarding({
 }) {
   const [{ step, draft }, setState] = useState(() => initial(today));
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [eduInitial, setEduInitial] = useState("");
   const setStep = (s: Step) => {
     if (s === "start") store.set(INTRO_KEY, "1");
     setState((v) => ({ ...v, step: s }));
@@ -107,62 +108,11 @@ export function Onboarding({
 
   if (step === "rule") return <RuleIntro onNext={() => setStep("start")} onBack={() => setStep("intro")} />;
 
-  if (step === "start")
-    return (
-      <Start
-        onRam={() => {
-          setEduInitial("ramkool");
-          setStep("edupage");
-        }}
-        onRam9b={() => finish(ram9bTemplate())}
-        onCode={(s) => finish(s)}
-        onCustom={() => setStep("school")}
-        onEdupage={() => {
-          setEduInitial("");
-          setStep("edupage");
-        }}
-        onIntro={() => setStep("intro")}
-      />
-    );
+  if (step === "start") return <Start onRam9b={() => finish(ram9bTemplate())} onCode={(s) => finish(s)} onSetup={() => setStep("school")} onIntro={() => setStep("intro")} />;
 
-  if (step === "edupage")
-    return (
-      <div className="flex flex-col gap-7 pb-10">
-        <NavBar title="EduPage" onBack={() => setStep("start")} />
-        <Lead title="Impordi EduPage'ist" text="Kui sinu kool avaldab tunniplaani edupage.org-is, tõmban selle sealt. Siis vali klass ja oma rühmad." />
-        <EduImport
-          actionLabel="Edasi"
-          initial={eduInitial}
-          onResult={(r) => {
-            const preset = SCHOOLS.find((x) => x.name === r.schoolName);
-            const w = defaultWindow(today, preset?.id ?? "custom");
-            const { segments, subjects } = eduSegments(r.periods, r.className, r.groupNames, w.start, w.end);
-            const real = segments.filter((sg) => !sg.assumed);
-            const current = real.find((sg) => today >= sg.start && today <= sg.end) ?? real[real.length - 1] ?? null;
-            setState({
-              step: "school",
-              draft: {
-                ...draft,
-                schoolId: preset?.id ?? "custom",
-                schoolName: preset ? "" : r.schoolName,
-                className: r.className,
-                window: w,
-                timetableFrom: w.start,
-                subjectNames: (subjects.length ? subjects : r.subjects).map((x) => x.name),
-                timetable: current?.timetable ?? r.timetable,
-                segments: segments.length ? segments : undefined,
-                currentSegId: current?.id,
-                baseline: {},
-              },
-            });
-            window.scrollTo({ top: 0 });
-          }}
-        />
-      </div>
-    );
-
-  const idx = SETUP_STEPS.indexOf(step);
-  const back = () => setStep(idx > 0 ? SETUP_STEPS[idx - 1] : "start");
+  const flow = flowFor(draft.source);
+  const idx = Math.max(0, flow.indexOf(step));
+  const back = () => setStep(idx > 0 ? flow[idx - 1] : "start");
   const subjects = draft.subjectNames.map((n) => ({ id: subjectId(n), name: n }));
   const used = new Set(Object.values(draft.timetable).flat().map((l) => l.subjectId));
   const usedSubjects = subjects.filter((s) => used.has(s.id));
@@ -170,7 +120,7 @@ export function Onboarding({
 
   const next: { label: string; disabled?: boolean; onClick: () => void } =
     step === "school"
-      ? { label: "Edasi", disabled: draft.schoolId === "custom" && !draft.schoolName.trim(), onClick: () => setStep("subjects") }
+      ? { label: "Edasi", disabled: draft.schoolId === "custom" && !draft.schoolName.trim(), onClick: () => setStep("source") }
       : step === "subjects"
         ? { label: draft.subjectNames.length ? `Edasi (${draft.subjectNames.length} ainet)` : "Vali ained", disabled: !draft.subjectNames.length, onClick: () => setStep("timetable") }
         : step === "timetable"
@@ -189,9 +139,63 @@ export function Onboarding({
 
   return (
     <div className="flex flex-col gap-7 pb-28">
-      <NavBar title={STEP_TITLE[step]!} onBack={back} trailing={<span className="num text-[13px] text-muted pr-1">{idx + 1}/4</span>} />
+      <NavBar
+        title={step === "timetable" && draft.source !== "manual" ? "Kontrolli üle" : STEP_TITLE[step]!}
+        onBack={back}
+        trailing={<span className="num text-[13px] text-muted pr-1">{idx + 1}/{flow.length}</span>}
+      />
 
       {step === "school" && <SchoolStep draft={draft} today={today} patch={patch} />}
+
+      {step === "source" && (
+        <>
+          <Lead
+            title="Tunniplaan"
+            text={
+              draft.schoolId === "ram"
+                ? "Tõmban selle RAMi EduPage'ist. Vali oma klass ja rühmad, pärast saad kõike muuta."
+                : "Kui su kool avaldab tunniplaani edupage.org-is, tõmban selle sealt. Pärast saad kõike muuta."
+            }
+          />
+          <EduImport
+            key={draft.schoolId}
+            actionLabel="Edasi"
+            initial={draft.schoolId === "ram" ? "ramkool" : ""}
+            onResult={(r) => {
+              const { segments, subjects } = eduSegments(r.periods, r.className, r.groupNames, draft.window.start, draft.window.end);
+              const real = segments.filter((sg) => !sg.assumed);
+              const current = real.find((sg) => today >= sg.start && today <= sg.end) ?? real[real.length - 1] ?? null;
+              setState({
+                step: "timetable",
+                draft: {
+                  ...draft,
+                  source: "edupage",
+                  schoolName: draft.schoolId === "custom" && !draft.schoolName.trim() ? r.schoolName : draft.schoolName,
+                  className: r.className || draft.className,
+                  timetableFrom: draft.window.start,
+                  subjectNames: (subjects.length ? subjects : r.subjects).map((x) => x.name),
+                  timetable: current?.timetable ?? r.timetable,
+                  segments: segments.length ? segments : undefined,
+                  currentSegId: current?.id,
+                  baseline: {},
+                },
+              });
+              window.scrollTo({ top: 0 });
+            }}
+          />
+          <Section footer="Kui kool EduPage'i ei kasuta või import ei õnnestu.">
+            <Row
+              onClick={() => {
+                setState((v) => ({ step: "subjects", draft: { ...v.draft, source: "manual", segments: undefined, currentSegId: undefined } }));
+                window.scrollTo({ top: 0 });
+              }}
+              chevron
+            >
+              <span className="text-accent">Loo tunniplaan käsitsi</span>
+            </Row>
+          </Section>
+        </>
+      )}
 
       {step === "subjects" && (
         <>
@@ -305,6 +309,7 @@ export function Onboarding({
         </>
       )}
 
+      {step !== "source" && (
       <div className="fixed inset-x-0 bottom-0 px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-6 bg-gradient-to-t from-bg via-bg to-bg/0">
         <div className="max-w-[640px] mx-auto">
           <Button size="lg" className="w-full" disabled={next.disabled} onClick={next.onClick}>
@@ -312,6 +317,7 @@ export function Onboarding({
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -429,21 +435,7 @@ function Fact({ children }: { children: ReactNode }) {
   );
 }
 
-function Start({
-  onRam,
-  onRam9b,
-  onCode,
-  onCustom,
-  onEdupage,
-  onIntro,
-}: {
-  onRam: () => void;
-  onRam9b: () => void;
-  onCode: (s: Setup) => void;
-  onCustom: () => void;
-  onEdupage: () => void;
-  onIntro: () => void;
-}) {
+function Start({ onRam9b, onCode, onSetup, onIntro }: { onRam9b: () => void; onCode: (s: Setup) => void; onSetup: () => void; onIntro: () => void }) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   return (
@@ -483,23 +475,11 @@ function Start({
         </div>
       </Section>
 
-      <Section title="Rocca al Mare Kool">
-        <Row onClick={onRam} chevron>
-          <div>RAM, iga klass</div>
-          <div className="text-[13px] text-muted">Tunniplaan otse kooli EduPage'ist. Vali klass ja rühmad.</div>
+      <Section title="Või seadista ise">
+        <Row onClick={onSetup} chevron>
+          <div>Seadista oma klass</div>
+          <div className="text-[13px] text-muted">Kool, klass ja tunniplaan. Kooli EduPage'ist umbes 30 sekundit.</div>
         </Row>
-      </Section>
-
-      <Section title="Muu kool">
-        <Row onClick={onEdupage} chevron>
-          <div>Impordi EduPage'ist</div>
-          <div className="text-[13px] text-muted">Kui kool avaldab tunniplaani edupage.org-is. Umbes 30 sekundit.</div>
-        </Row>
-        <Row onClick={onCustom} chevron>
-          <div>Seadista käsitsi</div>
-          <div className="text-[13px] text-muted">Kool, ained ja tunniplaan. Umbes kaks minutit.</div>
-        </Row>
-
       </Section>
 
       <div className="flex flex-wrap gap-x-2">
