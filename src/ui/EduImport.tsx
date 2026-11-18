@@ -154,13 +154,8 @@ export function EduImport({
     <div className="flex flex-col gap-7">
       <Section
         title="Kooli tunniplaan"
-        footer={
-          phase.k === "error" ? (
-            <span className="text-bad">{phase.msg}</span>
-          ) : (
-            "Kooli EduPage'i aadress, nt ramkool.edupage.org, või link tunniplaanile. Muuda, kui su kool on teine."
-          )
-        }
+        footer={phase.k === "error" ? <span className="text-bad">{phase.msg}</span> : undefined}
+        info="Kooli EduPage'i aadress, nt ramkool.edupage.org, või link tunniplaanile. Muuda, kui su kool on teine."
       >
         <form
           noValidate
@@ -231,7 +226,7 @@ export function EduImport({
             <Section
               key={v.id}
               title={v.title}
-              footer={k === divisions.length - 1 ? "Küsin ainult rühmade kohta, mille tunnid on eri päevadel või eri ainetes. Muud valikud ei muuda midagi." : undefined}
+              info={k === divisions.length - 1 ? "Küsin ainult rühmade kohta, mille tunnid on eri päevadel või eri ainetes. Muud valikud ei muuda midagi." : undefined}
             >
               {v.groups.map((g) => (
                 <button
@@ -259,7 +254,9 @@ export function EduImport({
               footer={
                 result.skippedAlternating
                   ? `${result.skippedAlternating} tundi toimub üle nädala ja jäi välja, et piir ei tuleks liiga lõdvalt. Lisa need hiljem käsitsi, kui vaja.`
-                  : `${ready.snapshot ? `Kooli tunniplaan seisuga ${ready.snapshot.split("-").reverse().join(".")}. ` : ""}Loen ka selle õppeaasta varasemad tunniplaanid, et tundide arv oleks kogu perioodi kohta õige. Ühekordseid üritusi tunniplaan ei tea.`
+                  : ready.snapshot
+                    ? `Kooli tunniplaan seisuga ${ready.snapshot.split("-").reverse().join(".")}.`
+                    : undefined
               }
             >
               <Row detail={<span className="num">{result.subjects.length}</span>}>Ained</Row>

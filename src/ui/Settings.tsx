@@ -61,7 +61,7 @@ export function Settings({ store }: { store: Store }) {
             <IconLabel icon="calendar">Periood</IconLabel>
           </Row>
         </Section>
-        <Section className="[--sep-inset:62px]" title="Tunniplaan" footer="Import loeb kooli tunniplaani edupage.org-ist (nt RAM: ramkool). Pärast saad seda muuta.">
+        <Section className="[--sep-inset:62px]" title="Tunniplaan" info="Import loeb kooli tunniplaani edupage.org-ist (nt RAM: ramkool). Pärast saad seda muuta.">
           <Row onClick={() => open("edupage")} chevron>
             <IconLabel icon="download">Impordi EduPage'ist</IconLabel>
           </Row>
@@ -75,7 +75,7 @@ export function Settings({ store }: { store: Store }) {
             <IconLabel icon="calendarX">Vabad päevad</IconLabel>
           </Row>
         </Section>
-        <Section className="[--sep-inset:62px]" title="Andmed" footer="Kõik on ainult selles seadmes. Klassikaaslastega jagad ainult tunniplaani ja reeglit, mitte puudumisi.">
+        <Section className="[--sep-inset:62px]" title="Andmed" info="Kõik on ainult selles seadmes. Klassikaaslastega jagad ainult tunniplaani ja reeglit, mitte puudumisi.">
           <Row onClick={() => open("share")} chevron>
             <IconLabel icon="share">Jaga klassiga</IconLabel>
           </Row>
@@ -83,7 +83,7 @@ export function Settings({ store }: { store: Store }) {
             <IconLabel icon="archive">Varukoopia</IconLabel>
           </Row>
         </Section>
-        <Section className="[--sep-inset:62px]" title="Testimine" footer="Näidisandmed (RAM 9.b, iga olek korraga), et äppi proovida ilma ise andmeid sisestamata. Sinu päris andmed pannakse kõrvale ja tulevad tagasi, kui testrežiimi välja lülitad.">
+        <Section className="[--sep-inset:62px]" title="Testimine" info="Näidisandmed (RAM 9.b, iga olek korraga), et äppi proovida ilma ise andmeid sisestamata. Sinu päris andmed pannakse kõrvale ja tulevad tagasi, kui testrežiimi välja lülitad.">
           <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
             <IconLabel icon="flask">Testrežiim</IconLabel>
             <Switch label="Testrežiim" checked={!!data.demo} onChange={(on) => (on ? enterDemo(data, replaceAll) : leaveDemo(data, replaceAll))} />
@@ -280,7 +280,7 @@ function RulePage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }) {
         ))}
       </Section>
 
-      <Section title="Tagajärg" footer="Mis juhtub, kui jõuad piirini. Näidatakse esilehel, kui aine on üle piiri.">
+      <Section title="Tagajärg" info="Mis juhtub, kui jõuad piirini. Näidatakse esilehel, kui aine on üle piiri.">
         <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
           <span>Automaatne (mitte õpetaja otsus)</span>
           <Switch label="Tagajärg on automaatne" checked={setup.rule.automatic} onChange={(v) => updateSetup((d) => void (d.rule.automatic = v))} />
@@ -311,7 +311,7 @@ function DateRow({ label, value, onChange }: { label: string; value: string; onC
 function WindowPage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }) {
   return (
     <>
-      <Section title="Arvestusperiood" footer="Periood, mille kohta kooli piir kehtib, nt poolaasta. Viimane päev on viimane arvesse minev koolipäev.">
+      <Section title="Arvestusperiood" info="Periood, mille kohta kooli piir kehtib, nt poolaasta. Viimane päev on viimane arvesse minev koolipäev.">
         <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
           <span>Nimi</span>
           <input className="bg-transparent border-0 text-right text-muted text-[17px] w-1/2" value={setup.windowName} onChange={(e) => updateSetup((d) => void (d.windowName = e.target.value))} aria-label="Perioodi nimi" />
@@ -335,7 +335,7 @@ function SubjectsPage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }
   const usesBaseline = Object.values(setup.baseline).some((n) => n > 0) || setup.segments.some((s) => s.start > setup.windowStart);
   return (
     <>
-      <Section title="Ained" footer="Lüliti: kas aine läheb piiri arvestusse. Number paremal on perioodi tunnid kokku.">
+      <Section title="Ained" info="Lüliti: kas aine läheb piiri arvestusse. Number paremal on perioodi tunnid kokku.">
         {setup.subjects.map((s, i) => (
           <div key={s.id} className="cell flex items-center gap-3 px-5 min-h-[52px]">
             <input aria-label="Aine nimi" className="cell-input flex-1 min-w-0" value={s.name} onChange={(e) => updateSetup((d) => void (d.subjects[i].name = e.target.value))} />
@@ -364,7 +364,7 @@ function SubjectsPage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }
         </form>
       </Section>
 
-      <Section title="Vähem tähtis" footer="Nt hinne alles aasta lõpus või hinnet ei saa. Loeb edasi, aga ei tõuse esilehel esile.">
+      <Section title="Vähem tähtis" info="Nt hinne alles aasta lõpus või hinnet ei saa. Loeb edasi, aga ei tõuse esilehel esile.">
         {setup.subjects
           .filter((s) => s.tracked)
           .map((s) => {
@@ -499,7 +499,7 @@ function HolidaysPage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }
           </Row>
         </Section>
       )}
-      <Section title="Päevad ilma tundideta" footer="Need vähendavad tundide koguarvu, seega ka lubatud puudumisi.">
+      <Section title="Päevad ilma tundideta" info="Need vähendavad tundide koguarvu, seega ka lubatud puudumisi.">
         {runs.length === 0 && (
           <Row>
             <span className="text-muted">Vabu päevi pole lisatud</span>
@@ -539,7 +539,7 @@ function HolidaysPage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }
         </div>
       </Section>
       {Object.keys(setup.cancelled ?? {}).length > 0 && (
-        <Section title="Ärajäänud tunnid" footer="Need tunnid ei toimunud või ei toimu. Need vähendavad aine tundide koguarvu, aga ei ole puudumised.">
+        <Section title="Ärajäänud tunnid" info="Need tunnid ei toimunud või ei toimu. Need vähendavad aine tundide koguarvu, aga ei ole puudumised.">
           {Object.entries(setup.cancelled!)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([date, subs]) => (

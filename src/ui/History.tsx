@@ -54,7 +54,7 @@ export function History({
         </Card>
       </div>
 
-      <Section footer={importOpen ? undefined : "Kopeeri puudumiste nimekiri Stuudiumist või eKoolist ja kleebi siia. Enne importi näed, mis leiti."}>
+      <Section>
         <Row onClick={() => setImportOpen((v) => !v)} chevron={!importOpen}>
           <span className="text-accent">{importOpen ? "Sulge import" : "Kleebi Stuudiumist või eKoolist"}</span>
         </Row>
@@ -151,7 +151,7 @@ export function History({
       >
         {editing && (
           <>
-            <Section title="Tunnid" footer="Muuda, mitu tundi igas aines puudusid. 0 eemaldab aine sellest sissekandest.">
+            <Section title="Tunnid" info="Muuda, mitu tundi igas aines puudusid. 0 eemaldab aine sellest sissekandest.">
               {Object.keys(editing.lessons).map((id) => (
                 <div key={id} className="cell flex items-center justify-between gap-3 px-5 min-h-[56px]">
                   <span className="min-w-0 truncate">{name(id)}</span>

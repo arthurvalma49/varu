@@ -238,7 +238,7 @@ export function Onboarding({
             <WeekEditor subjects={subjects} timetable={draft.timetable} onChange={(timetable) => patch({ timetable })} />
           </div>
           {draft.segments?.length ? (
-            <Section title="Perioodid EduPage'ist" footer="Ülal muudad praegust perioodi. Teiste perioodide tunnid tulevad kooli tunniplaanist. Ühekordseid üritusi (nt ekskursioon) tunniplaan ei tea, need lisa vabade päevade alla.">
+            <Section title="Perioodid EduPage'ist" info="Ülal muudad praegust perioodi. Teiste perioodide tunnid tulevad kooli tunniplaanist. Ühekordseid üritusi (nt ekskursioon) tunniplaan ei tea, need lisa vabade päevade alla.">
               {draft.segments.map((sg) => (
                 <Row key={sg.id} detail={<span className="num text-[15px]">{fmtShort(sg.start)} – {fmtShort(sg.end)}</span>}>
                   <span className={sg.id === draft.currentSegId ? "font-semibold" : sg.assumed ? "text-muted" : ""}>

@@ -219,7 +219,7 @@ export function LogAbsence({
       </Section>
 
       {multi && (
-        <Section title={rangeDays.length ? `${rangeDays.length} koolipäeva` : undefined} footer={rangeDays.length ? "Iga päev läheb eraldi kirja, kõik selle päeva tunnid. Üksikuid tunde saad hiljem ajaloos muuta." : "Valitud vahemikus pole tunde. Vali teised kuupäevad."}>
+        <Section title={rangeDays.length ? `${rangeDays.length} koolipäeva` : undefined} info={rangeDays.length ? "Iga päev läheb eraldi kirja, kõik selle päeva tunnid. Üksikuid tunde saad hiljem ajaloos muuta." : "Valitud vahemikus pole tunde. Vali teised kuupäevad."}>
           {rangeDays.map((d) => {
             const n = Object.values(d.lessons).reduce((x, y) => x + y, 0);
             return (
@@ -260,7 +260,7 @@ export function LogAbsence({
       )}
 
       {cancelMode && cancelEffect.length > 0 && (
-        <Section title="Mis muutub" footer="Lubatud puudumised arvutatakse uuest, väiksemast tundide arvust.">
+        <Section title="Mis muutub" info="Lubatud puudumised arvutatakse uuest, väiksemast tundide arvust.">
           {cancelEffect.map(({ before, after }) => (
             <Row
               key={before.subject.id}
@@ -372,7 +372,7 @@ export function LogAbsence({
       )}
 
       {!cancelMode && p.lines.length > 0 && (
-        <Section title="Mis alles jääb" footer={`Puudutud / kõik perioodi tunnid${future ? ", koos plaanidega" : ""}.`}>
+        <Section title="Mis alles jääb" info={`Puudutud / kõik perioodi tunnid${future ? ", koos plaanidega" : ""}.`}>
           <div aria-live="polite">
             {p.lines.map((l) => (
               <Row key={l.subjectId} detail={l.counted ? <Pill status={statusOf(l.leftAfter)}>{leftLabel(l.leftAfter)}</Pill> : <span className="text-[15px]">ei lähe arvesse</span>}>

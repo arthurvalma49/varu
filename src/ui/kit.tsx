@@ -66,6 +66,7 @@ const ICONS = {
   calendarX: "M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm5 8 4 4m0-4-4 4",
   trash: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13",
   pencil: "M4 20h4L19 9l-4-4L4 16v4Z",
+  info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v5M12 7.5v.01",
   tray: "M4 13h4l2 3h4l2-3h4M4 13l2-8h12l2 8v6H4v-6Z",
 } as const;
 export type IconName = keyof typeof ICONS;
@@ -128,12 +129,45 @@ export function NavBar({ title, onBack, backLabel = "Tagasi", trailing }: { titl
 }
 
 /** Inset grouped section: uppercase header, rounded group, optional footer. */
-export function Section({ title, footer, children, className = "" }: { title?: ReactNode; footer?: ReactNode; children: ReactNode; className?: string }) {
+/**
+ * Inset grouped list. `footer` is always shown (use it for warnings and things that change);
+ * `info` is background help, hidden behind an (i) next to the title until asked for.
+ */
+export function Section({
+  title,
+  footer,
+  info,
+  children,
+  className = "",
+}: {
+  title?: ReactNode;
+  footer?: ReactNode;
+  info?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [showInfo, setShowInfo] = useState(false);
   return (
     <section className={`flex flex-col ${className}`}>
-      {title && <h2 className="m-0 px-5 pb-2 text-[15px] font-semibold text-ink">{title}</h2>}
+      {(title || info) && (
+        <div className="flex items-center justify-between gap-2 px-5 pb-2 min-h-[22px]">
+          {title ? <h2 className="m-0 text-[15px] font-semibold text-ink">{title}</h2> : <span />}
+          {info && (
+            <button
+              type="button"
+              onClick={() => setShowInfo((v) => !v)}
+              aria-expanded={showInfo}
+              aria-label={showInfo ? "Peida selgitus" : "Mis see on?"}
+              className={`-my-3 -mr-3 size-11 shrink-0 grid place-items-center rounded-full cursor-pointer transition-colors ${showInfo ? "text-accent" : "text-faint active:text-muted"}`}
+            >
+              <Icon name="info" size={19} stroke={2} />
+            </button>
+          )}
+        </div>
+      )}
       <div className="bg-surface rounded-[26px] overflow-hidden">{children}</div>
       {footer && <div className="px-5 pt-2 text-[13px] leading-[18px] text-muted">{footer}</div>}
+      {info && showInfo && <div className="fade-in px-5 pt-2 text-[13px] leading-[18px] text-muted">{info}</div>}
     </section>
   );
 }

@@ -160,7 +160,7 @@ export function Overview({
 
       {/* The focus day's lessons, one by one */}
       {focus && timetableOn(setup, focus).length > 0 && (
-        <Section title={`${dayWord}, ${fmtDate(focus)}`} footer="Võid = selle tunni võid vahele jätta ja jääd piiri sisse. Paaristund võtab 2 tundi varu. Lükka tundi vasakule või hoia sõrme peal, et näha valikuid.">
+        <Section title={`${dayWord}, ${fmtDate(focus)}`} info="Võid = selle tunni võid vahele jätta ja jääd piiri sisse. Paaristund võtab 2 tundi varu. Lükka tundi vasakule või hoia sõrme peal, et näha valikuid.">
           {(() => {
             // Show the timetable as planned, with cancelled lessons crossed out (they can be restored).
             const planned = timetableOn(setup, focus);
@@ -336,7 +336,11 @@ export function Overview({
         const collapsed = g.id === "calm" && calmCollapsible && !showCalm;
         const list = collapsed ? g.rows.slice(0, 4) : g.rows;
         return (
-          <Section key={g.id} title={g.id === "edge" ? <span className="text-bad">{g.title}</span> : g.title}>
+          <Section
+            key={g.id}
+            title={g.id === "edge" ? <span className="text-bad">{g.title}</span> : g.title}
+            info={g === groups[0] ? `${cap(limitPhrase(setup.rule))}. Protsent on kogu perioodi tundidest, joon ribal on piir. Puuduta ainet, et näha täpsemalt.` : undefined}
+          >
             {list.map((r) => (
               <SubjectRowView key={r.subject.id} r={r} setup={setup} now={now} limitPct={limitPct} mh={mh} onOpen={() => onOpenSubject(r.subject.id)} />
             ))}
@@ -353,7 +357,7 @@ export function Overview({
 
       <div className="px-5 -mt-3 flex flex-col gap-3 text-[13px] text-muted num">
         <span>
-          {setup.windowName}: {schoolDaysLeft} koolipäeva veel · {limitPhrase(setup.rule)}. % on kogu perioodi tundidest, joon on piir.
+          {setup.windowName}: {schoolDaysLeft} koolipäeva veel.
         </span>
         <Button variant="ghost" onClick={onLog} className="self-start">
           Kontrolli muud päeva
