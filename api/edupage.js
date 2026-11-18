@@ -68,7 +68,9 @@ export default async function handler(req, res) {
     };
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
     res.status(200).send(JSON.stringify(out));
-  } catch {
-    res.status(502).send(JSON.stringify({ error: "edupage-unreachable" }));
+  } catch (e) {
+    // The reason (e.g. a timeout or a refused connection) helps tell a school typo from EduPage blocking us.
+    const reason = e?.cause?.code || e?.name || String(e?.message || "unknown").slice(0, 80);
+    res.status(502).send(JSON.stringify({ error: "edupage-unreachable", reason }));
   }
 }
