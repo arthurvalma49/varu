@@ -9,12 +9,13 @@ import { demoData } from "../core/demo";
 import { emptyTimetable, slug } from "../core/templates";
 import type { AppData, Setup } from "../core/types";
 import type { Store } from "../store";
-import { ActionSheet, Button, Check, DateField, Icon, LargeTitle, NavBar, Row, Section, Segmented, SettingsIcon, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
+import { haptic } from "./haptics";
+import { ActionSheet, Button, Check, DateField, Icon, LargeTitle, Sheet, NavBar, Row, Section, Segmented, SettingsIcon, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
 import { eduSegments } from "../core/edupage";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
 
-type Page = "root" | "rule" | "window" | "subjects" | "timetable" | "edupage" | "holidays" | "share" | "backup";
+type Page = "root" | "rule" | "window" | "subjects" | "timetable" | "edupage" | "holidays" | "share" | "backup" | "devtest";
 const TITLES: Record<Exclude<Page, "root">, string> = {
   rule: "Kool ja reegel",
   window: "Periood ja klass",
@@ -24,6 +25,7 @@ const TITLES: Record<Exclude<Page, "root">, string> = {
   holidays: "Vabad päevad",
   share: "Jaga klassiga",
   backup: "Varukoopia",
+  devtest: "Seadme test",
 };
 
 const LIMITS = [
@@ -88,6 +90,9 @@ export function Settings({ store }: { store: Store }) {
             <IconLabel icon="flask">Testrežiim</IconLabel>
             <Switch label="Testrežiim" checked={!!data.demo} onChange={(on) => (on ? enterDemo(data, replaceAll) : leaveDemo(data, replaceAll))} />
           </div>
+          <Row onClick={() => open("devtest")} chevron>
+            <IconLabel icon="gauge">Haptika ja ekraani test</IconLabel>
+          </Row>
         </Section>
         {!data.demo && <ResetAll onReset={() => replaceAll({ setup: null, absences: [] })} />}
       </div>
@@ -128,6 +133,7 @@ export function Settings({ store }: { store: Store }) {
       {page === "holidays" && <HolidaysPage setup={setup} updateSetup={updateSetup} />}
       {page === "share" && <SharePage data={data} replaceAll={replaceAll} setMsg={setMsg} />}
       {page === "backup" && <BackupPage data={data} replaceAll={replaceAll} setMsg={setMsg} />}
+      {page === "devtest" && <DevTestPage />}
       {msg && (
         <div className="px-5 text-[15px] text-muted" role="status">
           {msg}
@@ -685,3 +691,63 @@ function IconLabel({ icon, children }: { icon: Parameters<typeof SettingsIcon>[0
   );
 }
 
+/** Temporary on-device checks: which haptic route works, which sheet variant avoids the flash. */
+function DevTestPage() {
+  const [variant, setVariant] = useState<null | "A" | "B" | "C" | "D">(null);
+  const [sw, setSw] = useState(false);
+  const [n, setN] = useState(0);
+  const standalone = typeof window !== "undefined" && (window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone);
+  const ios = navigator.userAgent.match(/OS (\d+)_(\d+)/);
+  const variants = {
+    A: { label: "A: nagu praegu", lockScroll: true, backdrop: "full" as const },
+    B: { label: "B: leht võib kerida", lockScroll: false, backdrop: "full" as const },
+    C: { label: "C: tume kiht algab kella alt", lockScroll: true, backdrop: "below" as const },
+    D: { label: "D: tumedat kihti pole", lockScroll: true, backdrop: "none" as const },
+  };
+  const v = variant ? variants[variant] : null;
+  return (
+    <>
+      <Section title="Seade">
+        <Row detail={<span className="num">{ios ? `iOS ${ios[1]}.${ios[2]}` : "pole iOS"}</span>}>Süsteem</Row>
+        <Row detail={standalone ? "avakuvalt" : "brauseris"}>Avatud</Row>
+      </Section>
+      <Section title="Haptika" footer="Puuduta igat ja ütle, millise puhul telefon värises.">
+        <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
+          <span>1. Päris iOS lüliti</span>
+          {/* @ts-expect-error: Safari's native switch attribute */}
+          <input type="checkbox" switch="" className="scale-125" />
+        </label>
+        <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
+          <span>2. Äpi lüliti</span>
+          <Switch label="Äpi lüliti" checked={sw} onChange={setSw} />
+        </div>
+        <Row
+          onClick={() => {
+            haptic();
+            setN((x) => x + 1);
+          }}
+          detail={<span className="num">{n}</span>}
+        >
+          <span className="text-accent">3. Nupp (peidetud lüliti)</span>
+        </Row>
+        <label className="cell press flex items-center justify-between gap-3 px-5 min-h-[52px] cursor-pointer">
+          <span className="text-accent">4. Nupp, mis on ise lüliti silt</span>
+          {/* @ts-expect-error: Safari's native switch attribute */}
+          <input type="checkbox" switch="" className="absolute opacity-0 pointer-events-none size-px" />
+        </label>
+      </Section>
+      <Section title="Lehe avamine" footer="Ava igaüks ja vaata, kas ekraani ülaosa vilgub avamisel või sulgemisel.">
+        {(Object.keys(variants) as (keyof typeof variants)[]).map((k) => (
+          <Row key={k} onClick={() => setVariant(k)} chevron>
+            {variants[k].label}
+          </Row>
+        ))}
+      </Section>
+      <Sheet open={!!variant} onClose={() => setVariant(null)} title={v?.label ?? ""} lockScroll={v?.lockScroll ?? true} backdrop={v?.backdrop ?? "full"}>
+        <Section>
+          <Row>Sulge Loobu nupuga või tõmba alla.</Row>
+        </Section>
+      </Sheet>
+    </>
+  );
+}

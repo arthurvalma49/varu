@@ -297,7 +297,7 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="absolute inset-0 m-0 size-full opacity-0 cursor-pointer appearance-none"
+        className="absolute inset-0 m-0 size-full opacity-0 cursor-pointer"
       />
       {/* Like UISwitch: the knob stretches while held, then springs across. */}
       <span
@@ -437,17 +437,22 @@ export function Sheet({
   title,
   trailing,
   children,
+  lockScroll = true,
+  backdrop = "full",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   trailing?: ReactNode;
   children: ReactNode;
+  /** Test variants (Seaded > Testimine). */
+  lockScroll?: boolean;
+  backdrop?: "full" | "below" | "none";
 }) {
   const { mounted, shown } = usePresence(open, 450);
   const [drag, setDrag] = useState(0);
   const start = useRef<{ y: number; t: number } | null>(null);
-  useScrollLock(open);
+  useScrollLock(open && lockScroll);
   useEffect(() => {
     if (!open) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -470,7 +475,12 @@ export function Sheet({
   // Rendered at the top of the page so the tab bar never covers it.
   return createPortal(
     <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={title}>
-      <div className={`backdrop absolute inset-0 bg-black/40 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
+      {backdrop !== "none" && (
+        <div
+          className={`backdrop absolute inset-x-0 bottom-0 bg-black/40 ${backdrop === "below" ? "top-[env(safe-area-inset-top)]" : "top-0"} ${shown ? "opacity-100" : "opacity-0"}`}
+          onClick={onClose}
+        />
+      )}
       <div
         className={`sheet ${shown ? "" : "closing"} absolute inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+30px)] max-w-[640px] mx-auto bg-bg rounded-t-[26px] shadow-[0_-10px_40px_rgb(0_0_0/0.25)] flex flex-col overflow-hidden`}
         style={{ transform: shown ? `translateY(${drag}px)` : "translateY(100%)", transition: drag ? "none" : undefined }}
@@ -836,13 +846,13 @@ function Calendar({
           </button>
         </span>
       </div>
-      <div className="grid grid-cols-7 text-center text-[13px] font-semibold text-faint pb-1" aria-hidden>
+      <div className="grid grid-cols-7 text-center text-[12px] font-semibold text-muted pb-1.5" aria-hidden>
         {CAL_WD.map((d) => (
           <span key={d}>{d}</span>
         ))}
       </div>
       <div
-        className={`grid grid-cols-7 gap-y-0.5 select-none ${range ? "touch-none" : ""}`}
+        className={`grid grid-cols-7 gap-y-1 select-none ${range ? "touch-none" : ""}`}
         role="grid"
         aria-label={`${cap(MON_LONG[ym.m])} ${ym.y}`}
         onPointerDown={(e) => {
@@ -890,17 +900,14 @@ function Calendar({
           const sel = isStart || isEnd;
           const inside = range && lo && hi > lo && iso > lo && iso < hi;
           const isToday = iso === today;
-          const band = "var(--accent-soft)";
-          const bg =
-            range && lo && hi > lo
-              ? inside
-                ? band
-                : isStart
-                  ? `linear-gradient(90deg, transparent 50%, ${band} 50%)`
-                  : isEnd
-                    ? `linear-gradient(90deg, ${band} 50%, transparent 50%)`
-                    : undefined
-              : undefined;
+          const col = (lead + i) % 7;
+          const hasBand = range && !!lo && hi > lo && (inside || isStart || isEnd);
+          // The band is exactly as tall as the circles; it rounds off at week edges.
+          const bandCls = !hasBand
+            ? ""
+            : `${isStart ? "left-1/2" : col === 0 || i === 0 ? "left-[2px] rounded-l-full" : "left-0"} ${
+                isEnd ? "right-1/2" : col === 6 || i === days - 1 ? "right-[2px] rounded-r-full" : "right-0"
+              }`;
           return (
             <button
               key={iso}
@@ -913,20 +920,22 @@ function Calendar({
                 if (justDragged.current) return;
                 tap(iso);
               }}
-              className="group grid place-items-center h-11 cursor-pointer disabled:cursor-default"
-              style={{ background: bg }}
+              className="group relative grid place-items-center h-11 cursor-pointer disabled:cursor-default"
             >
+              {hasBand && <span aria-hidden className={`absolute top-[2px] bottom-[2px] bg-accent-soft ${bandCls}`} />}
               <span
-                className={`num size-10 grid place-items-center rounded-full text-[19px] transition-colors duration-150 ${
+                className={`relative num size-10 grid place-items-center rounded-full text-[19px] transition-[background-color,color,transform] duration-200 ${
                   sel
-                    ? `bg-accent text-accent-ink font-semibold ${free ? "opacity-70" : ""}`
+                    ? "bg-accent text-accent-ink font-semibold"
                     : off
                       ? "text-faint opacity-50"
                       : free
                         ? "text-faint"
-                        : isToday
-                          ? "text-accent font-semibold group-active:bg-surface-2"
-                          : "group-active:bg-surface-2"
+                        : inside
+                          ? "text-accent font-medium"
+                          : isToday
+                            ? "text-accent font-semibold group-active:bg-surface-2"
+                            : "group-active:bg-surface-2"
                 }`}
               >
                 {i + 1}
@@ -935,11 +944,9 @@ function Calendar({
           );
         })}
       </div>
-      <div className="flex items-center gap-2 pl-2 pt-2 text-[13px] text-muted">
-        <span className="num text-faint font-semibold">12</span>
-        <span>hall = koolivaba päev, ei lähe arvesse</span>
+      <div className="px-2 pt-2 text-[13px] leading-[18px] text-muted">
+        {range ? "Puuduta esimest ja viimast päeva või vea sõrmega üle. " : ""}Hallid päevad on koolivabad ja ei lähe arvesse.
       </div>
-      {range && <div className="pl-2 pt-1 text-[13px] text-muted">Puuduta esimest ja viimast päeva või vea sõrmega üle päevade.</div>}
     </div>
   );
 }
