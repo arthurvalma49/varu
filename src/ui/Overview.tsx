@@ -17,6 +17,7 @@ export function Overview({
   onLogLesson,
   onCancel,
   onOpenSubject,
+  onUnlogLesson,
 }: {
   setup: Setup;
   rows: SubjectRow[];
@@ -27,6 +28,7 @@ export function Overview({
   onLogLesson: (date: string, subjectId: string, count: number) => void;
   onCancel: (date: string, changes: Record<string, number>, label: string) => void;
   onOpenSubject: (subjectId: string) => void;
+  onUnlogLesson: (date: string, subjectId: string, count: number) => void;
 }) {
   const [showCalm, setShowCalm] = useState(false);
   /** The action sheet currently shown (lesson options, or which half of a double lesson). */
@@ -252,9 +254,19 @@ export function Overview({
                 if (remaining > 1) return askHalf();
                 onLogLesson(focus, b.subjectId, remaining);
               };
-              const openMore = () => setSheet({ title: `${name(b.subjectId)}${t ? `, ${t.start}` : ""}`, message: status, actions: done ? cancelActions : [...skipActions, ...cancelActions] });
+              const unlog: SheetAction = {
+                label: logged > 1 ? "Eemalda puudumine (mõlemad tunnid)" : "Eemalda puudumine",
+                destructive: true,
+                onClick: () => onUnlogLesson(focus, b.subjectId, logged),
+              };
+              const openMore = () =>
+                setSheet({
+                  title: `${name(b.subjectId)}${t ? `, ${t.start}` : ""}`,
+                  message: status,
+                  actions: [...(done ? [] : skipActions), ...(logged ? [unlog] : []), ...(done ? [] : cancelActions)],
+                });
               const swipe: SwipeAction[] = done
-                ? []
+                ? [{ label: "Eemalda", icon: "x", tone: "gray", onClick: () => onUnlogLesson(focus, b.subjectId, logged) }]
                 : [
                     { label: "Jääb ära", icon: "calendarX", tone: "gray", onClick: () => onCancel(focus, { [b.subjectId]: b.count }, `${name(b.subjectId)} jääb ära.`) },
                     { label: "Puudun", icon: "check", tone: ok ? "blue" : "red", onClick: skip },
@@ -273,9 +285,15 @@ export function Overview({
                       <div className={`text-[13px] num truncate ${done ? "text-muted" : ok ? "text-ok" : oneOnly ? "text-warn" : "text-bad"}`}>{status}</div>
                     </div>
                     {done ? (
-                      <span className="text-ok shrink-0 fade-in px-2">
-                        <Icon name="check" size={20} stroke={2.4} />
-                      </span>
+                      <button
+                        type="button"
+                        onClick={openMore}
+                        aria-label={`${name(b.subjectId)}: kirjas, muuda`}
+                        className="tap shrink-0 fade-in flex items-center gap-1.5 min-h-9 min-w-[86px] mr-11 px-3 rounded-full bg-ok-soft text-ok text-[15px] font-semibold cursor-pointer"
+                      >
+                        <Icon name="check" size={17} stroke={2.6} />
+                        Kirjas
+                      </button>
                     ) : (
                       <>
                         <Button

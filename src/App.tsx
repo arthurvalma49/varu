@@ -129,6 +129,28 @@ export default function App() {
       key: Date.now(),
     });
   };
+  /** Takes logged lessons of one subject off a day again (from whichever entries hold them). */
+  const unlogLesson = (date: string, subjectId: string, count: number) => {
+    const entries = data.absences.filter((a) => a.date === date && a.lessons[subjectId]);
+    if (!entries.length) return;
+    let left = count;
+    const restore: (() => void)[] = [];
+    for (const e of entries) {
+      if (left <= 0) break;
+      const k = Math.min(left, e.lessons[subjectId]);
+      left -= k;
+      const next = { ...e.lessons, [subjectId]: e.lessons[subjectId] - k };
+      if (!next[subjectId]) delete next[subjectId];
+      if (Object.keys(next).length) {
+        updateAbsence(e.id, next);
+        restore.push(() => updateAbsence(e.id, e.lessons));
+      } else {
+        removeAbsence(e.id);
+        restore.push(() => addAbsences([e]));
+      }
+    }
+    setToast({ text: `${name(subjectId)}: puudumine eemaldatud.`, undo: () => restore.forEach((f) => f()), key: Date.now() });
+  };
   const removed = (id: string) => {
     const a = data.absences.find((x) => x.id === id);
     removeAbsence(id);
@@ -281,6 +303,7 @@ export default function App() {
             }}
             onSkipDay={skipDay}
             onLogLesson={logLesson}
+            onUnlogLesson={unlogLesson}
             onCancel={changeCancelled}
           />
         )}

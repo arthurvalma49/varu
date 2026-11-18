@@ -60,14 +60,36 @@ export function LogAbsence({
     setExtra({});
   };
 
+  // Lessons already logged on this day (from Täna or earlier entries) are shown as done, not offered again.
+  const loggedByDay = useMemo(() => {
+    const m = new Map<string, Record<string, number>>();
+    for (const a of absences) {
+      const d = m.get(a.date) ?? {};
+      for (const [id, n] of Object.entries(a.lessons)) d[id] = (d[id] ?? 0) + n;
+      m.set(a.date, d);
+    }
+    return m;
+  }, [absences]);
+  const loggedPerBlock = useMemo(() => {
+    const left = { ...(loggedByDay.get(date) ?? {}) };
+    return blocks.map((b) => {
+      if (b.selfStudy) return 0;
+      const k = Math.min(left[b.subjectId] ?? 0, b.count);
+      if (k) left[b.subjectId] -= k;
+      return k;
+    });
+  }, [blocks, loggedByDay, date]);
+  const openCount = (i: number) => blocks[i].count - loggedPerBlock[i];
+
   const sel = useMemo(() => {
     const s: Record<string, number> = {};
     blocks.forEach((b, i) => {
-      if (!b.selfStudy && !unchecked.has(i)) s[b.subjectId] = (s[b.subjectId] ?? 0) + (partial[i] ?? b.count);
+      const rest = b.count - loggedPerBlock[i];
+      if (!b.selfStudy && rest > 0 && !unchecked.has(i)) s[b.subjectId] = (s[b.subjectId] ?? 0) + Math.min(partial[i] ?? rest, rest);
     });
     for (const [id, n] of Object.entries(extra)) if (n > 0) s[id] = (s[id] ?? 0) + n;
     return s;
-  }, [blocks, unchecked, extra, partial]);
+  }, [blocks, unchecked, extra, partial, loggedPerBlock]);
 
   // Days with nothing to miss (weekends, holidays, self-study, outside the period) are greyed in the calendar.
   const noSchool = useCallback((d: string) => missableOn(setup, d).length === 0, [setup]);
@@ -80,10 +102,15 @@ export function LogAbsence({
       .map((d) => {
         const lessons: Record<string, number> = {};
         for (const b of missableOn(setup, d)) lessons[b.subjectId] = (lessons[b.subjectId] ?? 0) + b.count;
+        for (const [id, n] of Object.entries(loggedByDay.get(d) ?? {})) {
+          if (!lessons[id]) continue;
+          lessons[id] -= n;
+          if (lessons[id] <= 0) delete lessons[id];
+        }
         return { date: d, lessons };
       })
       .filter((x) => Object.keys(x.lessons).length);
-  }, [multi, date, until, setup]);
+  }, [multi, date, until, setup, loggedByDay]);
   const rangeSel = useMemo(() => {
     const s: Record<string, number> = {};
     for (const d of rangeDays) for (const [id, n] of Object.entries(d.lessons)) s[id] = (s[id] ?? 0) + n;
@@ -292,6 +319,15 @@ export function LogAbsence({
                   <span>{name(b.subjectId)}</span>
                 </div>
               </Row>
+            ) : openCount(i) <= 0 ? (
+              <div key={i} className="cell flex items-center gap-3 pl-5 pr-4 min-h-[52px]">
+                <span className="num text-[15px] text-muted w-12 shrink-0">{lessonTimes(setup, b)?.start ?? `${b.slot}.`}</span>
+                <span className="flex-1 min-w-0 truncate text-muted">{name(b.subjectId)}</span>
+                <span className="shrink-0 flex items-center gap-1 text-[15px] text-ok">
+                  <Icon name="check" size={16} stroke={2.6} />
+                  kirjas
+                </span>
+              </div>
             ) : (
               <div key={i} className="cell flex items-center pr-3">
                 <button
@@ -309,17 +345,19 @@ export function LogAbsence({
                   <span className="flex-1 min-w-0 truncate">{name(b.subjectId)}</span>
                   <Check on={!unchecked.has(i)} />
                 </button>
-                {b.count > 1 && !unchecked.has(i) ? (
+                {openCount(i) > 1 && !unchecked.has(i) ? (
                   <button
                     type="button"
-                    onClick={() => setPartial({ ...partial, [i]: (partial[i] ?? b.count) > 1 ? (partial[i] ?? b.count) - 1 : b.count })}
-                    aria-label={`${name(b.subjectId)}: puudud ${tunde(partial[i] ?? b.count)}, muuda`}
+                    onClick={() => setPartial({ ...partial, [i]: (partial[i] ?? openCount(i)) > 1 ? (partial[i] ?? openCount(i)) - 1 : openCount(i) })}
+                    aria-label={`${name(b.subjectId)}: puudud ${tunde(partial[i] ?? openCount(i))}, muuda`}
                     className="shrink-0 num min-h-8 px-3 rounded-full bg-accent-soft text-accent text-[13px] font-semibold cursor-pointer"
                   >
-                    {tunde(partial[i] ?? b.count)}
+                    {tunde(partial[i] ?? openCount(i))}
                   </button>
                 ) : (
-                  <span className="shrink-0 num text-[15px] text-muted px-1">{tunde(b.count)}</span>
+                  <span className="shrink-0 num text-[15px] text-muted px-1">
+                    {loggedPerBlock[i] ? `veel ${tunde(openCount(i))}` : tunde(b.count)}
+                  </span>
                 )}
               </div>
             ),
