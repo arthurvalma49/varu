@@ -10,13 +10,14 @@ import { Onboarding } from "./ui/Onboarding";
 import { Overview } from "./ui/Overview";
 import { Settings, leaveDemo } from "./ui/Settings";
 import { ShareCard } from "./ui/ShareCard";
-import { Button, Icon, LargeTitle, TAB_ICONS, cap, fmtDate, fmtLong, joinEt, tunde } from "./ui/kit";
+import { SubjectDetail } from "./ui/SubjectDetail";
+import { Button, Icon, LargeTitle, PlusButton, Sheet, TAB_ICONS, cap, fmtDate, fmtLong, joinEt, tunde } from "./ui/kit";
 
-type Tab = "overview" | "log" | "history" | "settings";
-const TITLES: Record<Tab, string> = { overview: "Täna", log: "Lisa", history: "Ajalugu", settings: "Seaded" };
+/** Three tabs, as in Apple's own apps; adding is a + button that opens a sheet. */
+type Tab = "overview" | "history" | "settings";
+const TITLES: Record<Tab, string> = { overview: "Täna", history: "Ajalugu", settings: "Seaded" };
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "overview", label: "Täna", icon: TAB_ICONS.overview },
-  { id: "log", label: "Lisa", icon: TAB_ICONS.log },
   { id: "history", label: "Ajalugu", icon: TAB_ICONS.history },
   { id: "settings", label: "Seaded", icon: TAB_ICONS.settings },
 ];
@@ -31,6 +32,8 @@ export default function App() {
   const { data, setSetup, addAbsences, removeAbsence, updateAbsence, replaceAll } = store;
   const [fresh, setFresh] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
+  const [lisaOpen, setLisaOpen] = useState(false);
+  const [detail, setDetail] = useState<string | null>(null);
   const [incoming, setIncoming] = useState<Setup | null>(readHashSetup);
   const [toast, setToast] = useState<{ text: string; undo?: () => void; key: number } | null>(null);
   const now = today();
@@ -63,6 +66,7 @@ export default function App() {
 
   const go = (t: Tab) => {
     setTab(t);
+    setDetail(null);
     setToast(null);
     window.scrollTo({ top: 0 });
   };
@@ -70,6 +74,7 @@ export default function App() {
   const lessonsIn = (a: Absence) => Object.values(a.lessons).reduce((s, n) => s + n, 0);
   const logged = (a: Absence) => {
     addAbsences([a]);
+    setLisaOpen(false);
     go("overview");
     setToast({
       text: `${a.date > now ? "Plaanis" : "Kirjas"}: ${fmtDate(a.date)}, ${tunde(lessonsIn(a))}`,
@@ -81,6 +86,7 @@ export default function App() {
   const loggedMany = (list: Absence[]) => {
     if (!list.length) return;
     addAbsences(list);
+    setLisaOpen(false);
     go("overview");
     const n = list.reduce((s, a) => s + lessonsIn(a), 0);
     const plan = list[0].date > now;
@@ -196,9 +202,14 @@ export default function App() {
             scrolled ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >
-          <div className="h-11 grid place-items-center font-semibold text-[17px]">{TITLES[tab]}</div>
+          <div className="h-11 max-w-[640px] mx-auto px-4 grid grid-cols-[44px_1fr_44px] items-center">
+            <span />
+            <span className="text-center font-semibold text-[17px]">{detail ? (data.setup.subjects.find((x) => x.id === detail)?.name ?? "") : TITLES[tab]}</span>
+            {!detail && <span className="justify-self-end"><PlusButton small onClick={() => setLisaOpen(true)} /></span>}
+          </div>
         </div>
       )}
+      <div id="app-main" className="min-h-dvh bg-bg">
       <main className="max-w-[640px] mx-auto px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-32 flex flex-col gap-7">
         {store.saveError && <SaveError />}
         {data.demo && (
@@ -209,7 +220,11 @@ export default function App() {
             </Button>
           </div>
         )}
-        {tab !== "settings" && <div className="-mx-4 -mb-3"><LargeTitle title={TITLES[tab]} subtitle={sub} /></div>}
+        {tab !== "settings" && !detail && (
+          <div className="-mx-4 -mb-3">
+            <LargeTitle title={TITLES[tab]} subtitle={sub} trailing={<PlusButton onClick={() => setLisaOpen(true)} />} />
+          </div>
+        )}
         {incoming && (
           <div className="rounded-[26px] bg-surface p-5 flex flex-col gap-3 fade-in">
             <div className="text-[15px]">
@@ -238,37 +253,58 @@ export default function App() {
             </div>
           </div>
         )}
-        {tab === "overview" && fresh && <ShareCard setup={data.setup} onClose={() => setFresh(false)} />}
-        {tab === "overview" && (
+        {tab === "overview" && detail && (
+          <SubjectDetail
+            key={detail}
+            setup={data.setup}
+            row={rows.find((r) => r.subject.id === detail)}
+            subjectId={detail}
+            absences={data.absences}
+            now={now}
+            onBack={() => {
+              setDetail(null);
+              window.scrollTo({ top: 0 });
+            }}
+          />
+        )}
+        {tab === "overview" && !detail && fresh && <ShareCard setup={data.setup} onClose={() => setFresh(false)} />}
+        {tab === "overview" && !detail && (
           <Overview
             setup={data.setup}
             rows={rows}
             absences={data.absences}
             now={now}
-            onLog={() => go("log")}
+            onLog={() => setLisaOpen(true)}
+            onOpenSubject={(id) => {
+              setDetail(id);
+              window.scrollTo({ top: 0 });
+            }}
             onSkipDay={skipDay}
             onLogLesson={logLesson}
             onCancel={changeCancelled}
           />
         )}
-        {tab === "log" && (
-          <LogAbsence
-            setup={data.setup}
-            rows={rows}
-            absences={data.absences}
-            now={now}
-            onSave={logged}
-            onSaveMany={loggedMany}
-            onCancel={(date, changes, label) => {
-              changeCancelled(date, changes, label);
-              setTab("overview");
-              window.scrollTo({ top: 0 });
-            }}
-          />
-        )}
-        {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onUpdate={updateAbsence} onImport={addAbsences} />}
+        {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onUpdate={updateAbsence} onImport={addAbsences} onAdd={() => setLisaOpen(true)} />}
         {tab === "settings" && <Settings store={store} />}
       </main>
+      </div>
+
+      <Sheet open={lisaOpen} onClose={() => setLisaOpen(false)} title="Lisa">
+        <LogAbsence
+          inSheet
+          setup={data.setup}
+          rows={rows}
+          absences={data.absences}
+          now={now}
+          onSave={logged}
+          onSaveMany={loggedMany}
+          onCancel={(date, changes, label) => {
+            changeCancelled(date, changes, label);
+            setLisaOpen(false);
+            go("overview");
+          }}
+        />
+      </Sheet>
 
       {toast && (
         <div
@@ -296,10 +332,10 @@ export default function App() {
       )}
 
       <nav className="fixed z-10 inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+10px)] px-5 pointer-events-none" aria-label="Põhimenüü">
-        <div className="glass pointer-events-auto max-w-[420px] mx-auto rounded-full p-1 grid grid-cols-4 relative">
+        <div className="glass pointer-events-auto max-w-[340px] mx-auto rounded-full p-1 grid grid-cols-3 relative">
           <span
             aria-hidden
-            className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/4)] rounded-full bg-surface-2 transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none"
+            className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] rounded-full bg-surface-2 transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none"
             style={{ transform: `translateX(${TABS.findIndex((t) => t.id === tab) * 100}%)` }}
           />
           {TABS.map((t) => {

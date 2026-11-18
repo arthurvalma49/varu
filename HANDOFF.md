@@ -39,7 +39,8 @@ Done and working:
 - Double lessons can be skipped one hour at a time (Täna asks which half; Lisa has an hour chip).
 - EduPage groups: only splits whose groups meet at different times or for different subjects are asked; each option shows its lessons ("Hispaania keel · T, N"). RAM 9.b: one question instead of five.
 - Testrežiim (Seaded → Testimine): demo data from `src/core/demo.ts`; the real data is parked in localStorage `varu:real` and restored on exit.
-- Onboarding has a "Kus mis on" page explaining the four tabs.
+- Apple-style interaction (kit.tsx): three tabs (Täna, Ajalugu, Seaded) plus a + button that opens Lisa as a sheet; `Sheet` (swipe down to close, page behind recedes, rendered in a portal), `ActionSheet`, `SwipeRow` (Mail-style swipe actions), `useLongPress` (context menu), Settings-style coloured icons, Apple empty states. Subject rows open `SubjectDetail`. Seaded pages push and pop.
+- Onboarding animates (content rises in, the rule page fills its blocks, the tab tour walks across the tab bar) and steps push like iOS; respects Reduce Motion. The tour explains the three tabs and the + button.
 - 33 vitest tests. `npm test` and `npm run build` pass.
 
 Known gaps:

@@ -18,7 +18,10 @@ export function LogAbsence({
   onSave,
   onSaveMany,
   onCancel,
+  inSheet,
 }: {
+  /** Shown inside the Lisa sheet: the save bar sits at the sheet's bottom, not above a tab bar. */
+  inSheet?: boolean;
   setup: Setup;
   rows: SubjectRow[];
   absences: Absence[];
@@ -395,7 +398,7 @@ export function LogAbsence({
       </Section>
       )}
 
-      <div className="glass sticky z-10 bottom-[calc(env(safe-area-inset-bottom)+82px)] rounded-full pl-5 pr-1.5 py-1.5 flex items-center gap-3">
+      <div className={`glass sticky z-10 ${inSheet ? "bottom-0" : "bottom-[calc(env(safe-area-inset-bottom)+82px)]"} rounded-full pl-5 pr-1.5 py-1.5 flex items-center gap-3`}>
         {cancelMode ? (
           <>
             <div role="status" className={`flex-1 min-w-0 text-[15px] leading-tight font-medium ${!cancelTotal ? "text-muted" : fewerAllowed.length ? "text-warn" : "text-ink"}`}>

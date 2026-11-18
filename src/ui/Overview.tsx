@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, missableOn, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
-import { Button, Card, Empty, Icon, Meter, Pill, Row, Section, WD_ON, WD_SHORT, cap, fmtDate, fmtLimit, joinEt, leftLabel, limitPhrase, pct, tunde } from "./kit";
+import { ActionSheet, Button, Card, Empty, Icon, Meter, Pill, Row, Section, SwipeRow, useLongPress, type SheetAction, type SwipeAction, WD_ON, WD_SHORT, cap, fmtDate, fmtLimit, joinEt, leftLabel, limitPhrase, pct, tunde } from "./kit";
 
 /** Without bell times, the list switches from today to the next school day at this hour. */
 const SCHOOL_DAY_OVER = 15;
@@ -16,6 +16,7 @@ export function Overview({
   onSkipDay,
   onLogLesson,
   onCancel,
+  onOpenSubject,
 }: {
   setup: Setup;
   rows: SubjectRow[];
@@ -25,10 +26,11 @@ export function Overview({
   onSkipDay: (date: string) => void;
   onLogLesson: (date: string, subjectId: string, count: number) => void;
   onCancel: (date: string, changes: Record<string, number>, label: string) => void;
+  onOpenSubject: (subjectId: string) => void;
 }) {
   const [showCalm, setShowCalm] = useState(false);
-  /** Open inline chooser under a lesson: more actions, or which half of a double lesson. */
-  const [menu, setMenu] = useState<{ i: number; kind: "more" | "half" } | null>(null);
+  /** The action sheet currently shown (lesson options, or which half of a double lesson). */
+  const [sheet, setSheet] = useState<{ title: string; message?: string; actions: SheetAction[] } | null>(null);
 
   if (!rows.length)
     return (
@@ -158,7 +160,7 @@ export function Overview({
 
       {/* The focus day's lessons, one by one */}
       {focus && timetableOn(setup, focus).length > 0 && (
-        <Section title={`${dayWord}, ${fmtDate(focus)}`} footer="Võid = selle tunni võid vahele jätta ja jääd piiri sisse. Paaristund võtab 2 tundi varu. Kolme punkti alt saad märkida, et tund jääb ära.">
+        <Section title={`${dayWord}, ${fmtDate(focus)}`} footer="Võid = selle tunni võid vahele jätta ja jääd piiri sisse. Paaristund võtab 2 tundi varu. Lükka tundi vasakule või hoia sõrme peal, et näha valikuid.">
           {(() => {
             // Show the timetable as planned, with cancelled lessons crossed out (they can be restored).
             const planned = timetableOn(setup, focus);
@@ -227,9 +229,35 @@ export function Overview({
                 const pt = setup.periodTimes?.[n];
                 return pt ? `${pt.start}–${pt.end}` : `${n}. tund`;
               });
-              const open = menu?.i === i ? menu.kind : null;
+              const skipActions: SheetAction[] =
+                remaining > 1
+                  ? [
+                      ...halves.slice(logged).map((label) => ({ label: `Puudun tunnist ${label}`, onClick: () => onLogLesson(focus, b.subjectId, 1) })),
+                      { label: "Puudun mõlemast", bold: true, destructive: !ok, onClick: () => onLogLesson(focus, b.subjectId, remaining) },
+                    ]
+                  : [{ label: "Puudun", bold: true, destructive: !ok, onClick: () => onLogLesson(focus, b.subjectId, remaining) }];
+              const cancelActions: SheetAction[] = [
+                { label: "Tund jääb ära", onClick: () => onCancel(focus, { [b.subjectId]: b.count }, `${name(b.subjectId)} jääb ära.`) },
+                {
+                  label: "Terve päev jääb ära",
+                  onClick: () => {
+                    const all: Record<string, number> = {};
+                    for (const x of missable) all[x.b.subjectId] = (all[x.b.subjectId] ?? 0) + x.b.count;
+                    onCancel(focus, all, `${dayWord} jääb ära.`);
+                  },
+                },
+              ];
+              const askHalf = () => setSheet({ title: `${name(b.subjectId)}: paaristund`, message: "Millest puudud?", actions: skipActions });
+              const skip = () => (remaining > 1 ? askHalf() : onLogLesson(focus, b.subjectId, remaining));
+              const openMore = () => setSheet({ title: `${name(b.subjectId)}${t ? `, ${t.start}` : ""}`, message: status, actions: done ? cancelActions : [...skipActions, ...cancelActions] });
+              const swipe: SwipeAction[] = done
+                ? []
+                : [
+                    { label: "Jääb ära", icon: "calendarX", tone: "gray", onClick: () => onCancel(focus, { [b.subjectId]: b.count }, `${name(b.subjectId)} jääb ära.`) },
+                    { label: "Puudun", icon: "check", tone: ok ? "blue" : "red", onClick: skip },
+                  ];
               return (
-                <div key={i} className="cell">
+                <LessonRow key={i} onLongPress={openMore} swipe={swipe}>
                   <div className={`flex items-center gap-2 pl-5 pr-3 min-h-[60px] ${highlight ? "bg-accent-soft/60" : ""}`}>
                     <SlotLabel
                       slot={b.slot}
@@ -250,8 +278,7 @@ export function Overview({
                         <Button
                           variant={ok || oneOnly ? "ghost" : "quiet"}
                           className={`shrink-0 min-h-9 px-3.5 text-[15px] ${ok || oneOnly ? "" : "text-bad"}`}
-                          aria-expanded={remaining > 1 ? open === "half" : undefined}
-                          onClick={() => (remaining > 1 ? setMenu(open === "half" ? null : { i, kind: "half" }) : onLogLesson(focus, b.subjectId, remaining))}
+                          onClick={skip}
                           aria-label={`Puudun: ${name(b.subjectId)} ${b.slot}`}
                         >
                           Puudun
@@ -259,8 +286,7 @@ export function Overview({
                         <button
                           type="button"
                           aria-label={`Muud valikud: ${name(b.subjectId)}`}
-                          aria-expanded={open === "more"}
-                          onClick={() => setMenu(open === "more" ? null : { i, kind: "more" })}
+                          onClick={openMore}
                           className="shrink-0 size-9 grid place-items-center rounded-full text-muted cursor-pointer active:bg-surface-2"
                         >
                           <Icon name="more" size={22} stroke={3} />
@@ -268,64 +294,7 @@ export function Overview({
                       </>
                     )}
                   </div>
-                  {open === "half" && !done && (
-                    <div className="px-5 pb-3 pt-1 flex flex-col gap-2 fade-in">
-                      <div className="text-[13px] text-muted">Paaristund. Millest puudud?</div>
-                      <div className="flex flex-wrap gap-2">
-                        {halves.map((label, k) => (
-                          <Button
-                            key={k}
-                            variant="ghost"
-                            className="min-h-9 text-[15px] num"
-                            onClick={() => {
-                              setMenu(null);
-                              onLogLesson(focus, b.subjectId, 1);
-                            }}
-                            aria-label={`Puudun ainult tunnist ${label}`}
-                          >
-                            {label}
-                          </Button>
-                        ))}
-                        <Button
-                          variant={ok ? "primary" : "danger"}
-                          className="min-h-9 text-[15px]"
-                          onClick={() => {
-                            setMenu(null);
-                            onLogLesson(focus, b.subjectId, remaining);
-                          }}
-                        >
-                          Mõlemast
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  {open === "more" && !done && (
-                    <div className="flex flex-wrap gap-2 px-5 pb-3 pt-1 fade-in">
-                      <Button
-                        variant="ghost"
-                        className="min-h-9 text-[15px]"
-                        onClick={() => {
-                          setMenu(null);
-                          onCancel(focus, { [b.subjectId]: b.count }, `${name(b.subjectId)} jääb ära.`);
-                        }}
-                      >
-                        Tund jääb ära
-                      </Button>
-                      <Button
-                        variant="quiet"
-                        className="min-h-9 text-[15px]"
-                        onClick={() => {
-                          setMenu(null);
-                          const all: Record<string, number> = {};
-                          for (const x of missable) all[x.b.subjectId] = (all[x.b.subjectId] ?? 0) + x.b.count;
-                          onCancel(focus, all, `${dayWord} jääb ära.`);
-                        }}
-                      >
-                        Terve päev jääb ära
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                </LessonRow>
               );
             });
           })()}
@@ -369,7 +338,7 @@ export function Overview({
         return (
           <Section key={g.id} title={g.id === "edge" ? <span className="text-bad">{g.title}</span> : g.title}>
             {list.map((r) => (
-              <SubjectRowView key={r.subject.id} r={r} setup={setup} now={now} limitPct={limitPct} mh={mh} />
+              <SubjectRowView key={r.subject.id} r={r} setup={setup} now={now} limitPct={limitPct} mh={mh} onOpen={() => onOpenSubject(r.subject.id)} />
             ))}
             {collapsed && (
               <Row onClick={() => setShowCalm(true)}>
@@ -379,6 +348,8 @@ export function Overview({
           </Section>
         );
       })}
+
+      <ActionSheet open={!!sheet} onClose={() => setSheet(null)} title={sheet?.title} message={sheet?.message} actions={sheet?.actions ?? []} />
 
       <div className="px-5 -mt-3 flex flex-col gap-3 text-[13px] text-muted num">
         <span>
@@ -431,7 +402,7 @@ function blockSizes(setup: Setup, subjectId: string, now: string) {
   return [...sizes];
 }
 
-function SubjectRowView({ r, setup, now, limitPct, mh }: { r: SubjectRow; setup: Setup; now: string; limitPct: number; mh: string }) {
+function SubjectRowView({ r, setup, now, limitPct, mh, onOpen }: { r: SubjectRow; setup: Setup; now: string; limitPct: number; mh: string; onOpen: () => void }) {
   let hint = r.subject.note ?? "";
   const atEdge = r.left === 0 && !r.subject.advisory;
   if (atEdge) {
@@ -443,10 +414,15 @@ function SubjectRowView({ r, setup, now, limitPct, mh }: { r: SubjectRow; setup:
     else if (r.left > 1 && r.left <= 5 && sizes.length === 1 && sizes[0] === 2) hint = `${hint} See on ${Math.floor(r.left / 2)} paaristundi.`.trim();
   }
   return (
-    <div className="cell px-5 py-3">
-      <div className="flex items-baseline justify-between gap-3">
+    <button type="button" onClick={onOpen} className="cell press block w-full text-left px-5 py-3 cursor-pointer" aria-label={`${r.subject.name}: ${leftLabel(r.left)}, ava`}>
+      <div className="flex items-center justify-between gap-3">
         <span className="truncate">{r.subject.name}</span>
-        <Pill status={r.status}>{leftLabel(r.left)}</Pill>
+        <span className="flex items-center gap-1.5 shrink-0">
+          <Pill status={r.status}>{leftLabel(r.left)}</Pill>
+          <span className="text-faint -mr-1.5">
+            <Icon name="right" size={16} stroke={2.4} />
+          </span>
+        </span>
       </div>
       <div className="text-[13px] text-muted num mt-0.5">
         {r.absent}/{r.total} puudutud · {pct(r.pct)}
@@ -460,6 +436,20 @@ function SubjectRowView({ r, setup, now, limitPct, mh }: { r: SubjectRow; setup:
         label={`${r.subject.name}: ${pct(r.pct)} puudutud, piir ${fmtLimit(setup.rule.limit)}`}
       />
       {hint && <div className={`text-[13px] mt-1.5 ${atEdge ? "text-bad" : "text-muted"}`}>{hint}</div>}
+    </button>
+  );
+}
+
+/** A lesson row: swipe left for actions, long-press for the full menu (context menu on iOS). */
+function LessonRow({ children, swipe, onLongPress }: { children: ReactNode; swipe: SwipeAction[]; onLongPress: () => void }) {
+  const press = useLongPress(onLongPress);
+  return swipe.length ? (
+    <SwipeRow actions={swipe} className="no-callout" {...press}>
+      {children}
+    </SwipeRow>
+  ) : (
+    <div className="cell no-callout select-none" {...press}>
+      {children}
     </div>
   );
 }

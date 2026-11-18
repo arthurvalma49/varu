@@ -2,7 +2,7 @@ import { useState } from "react";
 import { inWindow } from "../core/calc";
 import { parsePaste, toAbsences, type ParsedLine } from "../core/importer";
 import type { Absence, Setup } from "../core/types";
-import { Button, Card, Empty, Icon, MON_LONG, Row, Section, Stepper, cap, fmtDate, tunde } from "./kit";
+import { Button, Card, Empty, Icon, MON_LONG, Row, Section, Sheet, Stepper, SwipeRow, cap, fmtDate, tunde } from "./kit";
 
 export function History({
   setup,
@@ -11,6 +11,7 @@ export function History({
   onRemove,
   onUpdate,
   onImport,
+  onAdd,
 }: {
   setup: Setup;
   absences: Absence[];
@@ -18,6 +19,8 @@ export function History({
   onRemove: (id: string) => void;
   onUpdate: (id: string, lessons: Record<string, number>) => void;
   onImport: (a: Absence[]) => void;
+  /** Opens the Lisa sheet (from the empty state). */
+  onAdd: () => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<{ id: string; lessons: Record<string, number> } | null>(null);
@@ -69,7 +72,17 @@ export function History({
 
       {!list.length ? (
         <Card>
-          <Empty title="Puhas leht">Siia tulevad sinu puudumised. Märgi need vaates „Täna” või „Lisa”, või kleebi nimekiri oma e-koolist.</Empty>
+          <Empty
+            title="Puhas leht"
+            icon="tray"
+            action={
+              <Button variant="ghost" onClick={onAdd}>
+                Lisa puudumine
+              </Button>
+            }
+          >
+            Siia tulevad sinu puudumised. Märgi need vaates „Täna”, + nupuga või kleebi nimekiri oma e-koolist.
+          </Empty>
         </Card>
       ) : (
         months.map((m) => {
@@ -79,13 +92,17 @@ export function History({
               {m.items.map((e) => {
                 const counts = inWindow(setup, e.date);
                 const plan = e.date > now;
-                const isEditing = editing?.id === e.id;
                 return (
-                  <div key={e.id} className="cell">
+                  <SwipeRow
+                    key={e.id}
+                    actions={[
+                      { label: "Muuda", icon: "pencil", tone: "gray", onClick: () => setEditing({ id: e.id, lessons: { ...e.lessons } }) },
+                      { label: "Kustuta", icon: "trash", tone: "red", onClick: () => onRemove(e.id) },
+                    ]}
+                  >
                     <button
                       type="button"
-                      onClick={() => setEditing(isEditing ? null : { id: e.id, lessons: { ...e.lessons } })}
-                      aria-expanded={isEditing}
+                      onClick={() => setEditing({ id: e.id, lessons: { ...e.lessons } })}
                       className="press w-full flex items-center gap-3 px-5 py-3 text-left cursor-pointer"
                     >
                       <div className="flex-1 min-w-0">
@@ -102,48 +119,59 @@ export function History({
                         {e.note && <div className="text-[13px] text-muted mt-0.5 truncate">{e.note}</div>}
                       </div>
                       <span className="num text-muted shrink-0">{tunde(sum(e))}</span>
-                      <span className={`text-faint shrink-0 transition-transform duration-200 ${isEditing ? "rotate-90" : ""}`}>
+                      <span className="text-faint shrink-0">
                         <Icon name="right" size={18} stroke={2.4} />
                       </span>
                     </button>
-                    {isEditing && (
-                      <div className="px-5 pb-4 flex flex-col gap-1 fade-in">
-                        {Object.keys(e.lessons).map((id) => (
-                          <div key={id} className="flex items-center justify-between gap-3 min-h-11">
-                            <span className="min-w-0 truncate text-[15px]">{name(id)}</span>
-                            <Stepper label={name(id)} max={12} value={editing.lessons[id] ?? 0} onChange={(n) => setEditing({ ...editing, lessons: { ...editing.lessons, [id]: n } })} />
-                          </div>
-                        ))}
-                        <div className="flex gap-2 mt-2">
-                          <Button
-                            onClick={() => {
-                              if (Object.values(editing.lessons).some((n) => n > 0)) onUpdate(e.id, editing.lessons);
-                              else onRemove(e.id);
-                              setEditing(null);
-                            }}
-                          >
-                            Salvesta
-                          </Button>
-                          <Button
-                            variant="quiet"
-                            className="text-bad ml-auto"
-                            onClick={() => {
-                              onRemove(e.id);
-                              setEditing(null);
-                            }}
-                          >
-                            Kustuta
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  </SwipeRow>
                 );
               })}
             </Section>
           );
         })
       )}
+      <Sheet
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title={editing ? fmtDate(absences.find((a) => a.id === editing.id)?.date ?? "") : ""}
+        trailing={
+          <button
+            type="button"
+            className="text-accent font-semibold text-[17px] min-h-11 pl-3 cursor-pointer"
+            onClick={() => {
+              if (!editing) return;
+              if (Object.values(editing.lessons).some((n) => n > 0)) onUpdate(editing.id, editing.lessons);
+              else onRemove(editing.id);
+              setEditing(null);
+            }}
+          >
+            Valmis
+          </button>
+        }
+      >
+        {editing && (
+          <>
+            <Section title="Tunnid" footer="Muuda, mitu tundi igas aines puudusid. 0 eemaldab aine sellest sissekandest.">
+              {Object.keys(editing.lessons).map((id) => (
+                <div key={id} className="cell flex items-center justify-between gap-3 px-5 min-h-[56px]">
+                  <span className="min-w-0 truncate">{name(id)}</span>
+                  <Stepper label={name(id)} max={12} value={editing.lessons[id] ?? 0} onChange={(n) => setEditing({ ...editing, lessons: { ...editing.lessons, [id]: n } })} />
+                </div>
+              ))}
+            </Section>
+            <Section>
+              <Row
+                onClick={() => {
+                  onRemove(editing.id);
+                  setEditing(null);
+                }}
+              >
+                <span className="text-bad">Kustuta sissekanne</span>
+              </Row>
+            </Section>
+          </>
+        )}
+      </Sheet>
     </div>
   );
 }

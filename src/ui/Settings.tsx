@@ -9,7 +9,7 @@ import { demoData } from "../core/demo";
 import { emptyTimetable, slug } from "../core/templates";
 import type { AppData, Setup } from "../core/types";
 import type { Store } from "../store";
-import { Button, Check, Icon, LargeTitle, NavBar, Row, Section, Segmented, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
+import { ActionSheet, Button, Check, Icon, LargeTitle, NavBar, Row, Section, Segmented, SettingsIcon, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
 import { eduSegments } from "../core/edupage";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
@@ -38,8 +38,10 @@ export function Settings({ store }: { store: Store }) {
   const { data, updateSetup, replaceAll } = store;
   const setup = data.setup!;
   const [page, setPage] = useState<Page>("root");
+  const [dir, setDir] = useState<"push" | "pop">("push");
   const [msg, setMsg] = useState("");
   const open = (p: Page) => {
+    setDir(p === "root" ? "pop" : "push");
     setPage(p);
     setMsg("");
     window.scrollTo({ top: 0 });
@@ -47,43 +49,43 @@ export function Settings({ store }: { store: Store }) {
 
   if (page === "root")
     return (
-      <div className="flex flex-col gap-7">
+      <div className={`flex flex-col gap-7 ${dir === "pop" ? "pop-in" : ""}`}>
         <div className="-mx-4 -mb-3">
           <LargeTitle title="Seaded" subtitle={`${setup.schoolName}${setup.className ? ` · ${setup.className}` : ""}`} />
         </div>
-        <Section title="Kool">
+        <Section className="[--sep-inset:62px]" title="Kool">
           <Row onClick={() => open("rule")} chevron detail={<span className="num">{fmtLimit(setup.rule.limit)}</span>}>
-            Kool ja reegel
+            <IconLabel icon="building" color="#0a84ff">Kool ja reegel</IconLabel>
           </Row>
           <Row onClick={() => open("window")} chevron detail={<span className="truncate max-w-[40vw] inline-block align-bottom">{setup.windowName}</span>}>
-            Periood ja klass
+            <IconLabel icon="calendar" color="#ff9500">Periood</IconLabel>
           </Row>
         </Section>
-        <Section title="Tunniplaan" footer="Import loeb kooli tunniplaani edupage.org-ist (nt RAM: ramkool). Pärast saad seda muuta.">
+        <Section className="[--sep-inset:62px]" title="Tunniplaan" footer="Import loeb kooli tunniplaani edupage.org-ist (nt RAM: ramkool). Pärast saad seda muuta.">
           <Row onClick={() => open("edupage")} chevron>
-            <span className="text-accent">Impordi EduPage'ist</span>
+            <IconLabel icon="download" color="#30b0c7">Impordi EduPage'ist</IconLabel>
           </Row>
           <Row onClick={() => open("subjects")} chevron detail={<span className="num">{setup.subjects.filter((s) => s.tracked).length}</span>}>
-            Ained
+            <IconLabel icon="book" color="#34c759">Ained</IconLabel>
           </Row>
           <Row onClick={() => open("timetable")} chevron detail={<span className="num">{setup.segments.length}</span>}>
-            Tunniplaan
+            <IconLabel icon="grid" color="#5856d6">Tunniplaan</IconLabel>
           </Row>
           <Row onClick={() => open("holidays")} chevron detail={<span className="num">{setup.holidays.length + Object.keys(setup.cancelled ?? {}).length}</span>}>
-            Vabad päevad ja ärajäänud tunnid
+            <IconLabel icon="calendarX" color="#ff3b30">Vabad päevad</IconLabel>
           </Row>
         </Section>
-        <Section title="Andmed" footer="Kõik on ainult selles seadmes. Klassikaaslastega jagad ainult tunniplaani ja reeglit, mitte puudumisi.">
+        <Section className="[--sep-inset:62px]" title="Andmed" footer="Kõik on ainult selles seadmes. Klassikaaslastega jagad ainult tunniplaani ja reeglit, mitte puudumisi.">
           <Row onClick={() => open("share")} chevron>
-            Jaga klassiga
+            <IconLabel icon="share" color="#34c759">Jaga klassiga</IconLabel>
           </Row>
           <Row onClick={() => open("backup")} chevron>
-            Varukoopia
+            <IconLabel icon="archive" color="#8e8e93">Varukoopia</IconLabel>
           </Row>
         </Section>
-        <Section title="Testimine" footer="Näidisandmed (RAM 9.b, iga olek korraga), et äppi proovida ilma ise andmeid sisestamata. Sinu päris andmed pannakse kõrvale ja tulevad tagasi, kui testrežiimi välja lülitad.">
+        <Section className="[--sep-inset:62px]" title="Testimine" footer="Näidisandmed (RAM 9.b, iga olek korraga), et äppi proovida ilma ise andmeid sisestamata. Sinu päris andmed pannakse kõrvale ja tulevad tagasi, kui testrežiimi välja lülitad.">
           <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-            <span>Testrežiim</span>
+            <IconLabel icon="flask" color="#af52de">Testrežiim</IconLabel>
             <Switch label="Testrežiim" checked={!!data.demo} onChange={(on) => (on ? enterDemo(data, replaceAll) : leaveDemo(data, replaceAll))} />
           </div>
         </Section>
@@ -92,7 +94,7 @@ export function Settings({ store }: { store: Store }) {
     );
 
   return (
-    <div className="flex flex-col gap-7 -mt-3">
+    <div key={page} className="flex flex-col gap-7 -mt-3 push-in">
       <NavBar title={TITLES[page]} onBack={() => open("root")} backLabel="Seaded" />
       {page === "rule" && <RulePage setup={setup} updateSetup={updateSetup} />}
       {page === "window" && <WindowPage setup={setup} updateSetup={updateSetup} />}
@@ -664,22 +666,30 @@ function BackupPage({ data, replaceAll, setMsg }: { data: AppData; replaceAll: S
 function ResetAll({ onReset }: { onReset: () => void }) {
   const [ask, setAsk] = useState(false);
   return (
-    <Section footer={ask ? "Kustutab tunniplaani ja kõik puudumised selles seadmes. Seda ei saa tagasi võtta." : undefined}>
-      {ask ? (
-        <>
-          <Row onClick={onReset}>
-            <span className="text-bad font-semibold">Kustuta kõik</span>
-          </Row>
-          <Row onClick={() => setAsk(false)}>
-            <span className="text-accent">Loobu</span>
-          </Row>
-        </>
-      ) : (
+    <>
+      <Section>
         <Row onClick={() => setAsk(true)}>
           <span className="text-bad">Alusta otsast</span>
         </Row>
-      )}
-    </Section>
+      </Section>
+      <ActionSheet
+        open={ask}
+        onClose={() => setAsk(false)}
+        title="Kustutan tunniplaani ja kõik puudumised selles seadmes."
+        message="Seda ei saa tagasi võtta."
+        actions={[{ label: "Kustuta kõik", destructive: true, onClick: onReset }]}
+      />
+    </>
+  );
+}
+
+/** Settings row label with its coloured icon. */
+function IconLabel({ icon, color, children }: { icon: Parameters<typeof SettingsIcon>[0]["name"]; color: string; children: string }) {
+  return (
+    <span className="flex items-center gap-3">
+      <SettingsIcon name={icon} color={color} />
+      {children}
+    </span>
   );
 }
 

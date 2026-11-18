@@ -140,7 +140,7 @@ export function Onboarding({
             };
 
   return (
-    <div className="flex flex-col gap-7 pb-28">
+    <div key={step} className="flex flex-col gap-7 pb-28 push-in">
       <NavBar
         title={step === "timetable" && draft.source !== "manual" ? "Kontrolli üle" : STEP_TITLE[step]!}
         onBack={back}
@@ -343,15 +343,21 @@ function Welcome({
   return (
     <div className="min-h-dvh flex flex-col pt-[calc(env(safe-area-inset-top)+56px)] pb-[calc(env(safe-area-inset-bottom)+16px)] fade-in">
       <div className="px-2 flex-1">
-        <div className="size-16 rounded-[18px] bg-accent text-accent-ink grid place-items-center mb-6 shadow-[0_8px_24px_-8px_var(--accent)]">
+        <div className="pop size-16 rounded-[18px] bg-accent text-accent-ink grid place-items-center mb-6 shadow-[0_8px_24px_-8px_var(--accent)]">
           <Icon name="check" size={34} stroke={2.6} />
         </div>
-        <h1 className="m-0 text-[34px] leading-[40px] font-bold">{title}</h1>
-        {body && <p className="mt-3 mb-0 text-[17px] text-muted">{body}</p>}
+        <h1 className="rise m-0 text-[34px] leading-[40px] font-bold" style={{ animationDelay: "120ms" }}>
+          {title}
+        </h1>
+        {body && (
+          <p className="rise mt-3 mb-0 text-[17px] text-muted" style={{ animationDelay: "200ms" }}>
+            {body}
+          </p>
+        )}
         {features && (
           <ul className="list-none p-0 mt-9 mb-0 flex flex-col gap-6">
-            {features.map((f) => (
-              <li key={f.title} className="flex gap-4 items-start">
+            {features.map((f, i) => (
+              <li key={f.title} className="rise flex gap-4 items-start" style={{ animationDelay: `${300 + i * 110}ms` }}>
                 <span className="shrink-0 size-11 rounded-full bg-accent-soft text-accent grid place-items-center">
                   <Icon name={f.icon} size={22} />
                 </span>
@@ -364,7 +370,7 @@ function Welcome({
           </ul>
         )}
       </div>
-      <div className="flex flex-col gap-1 mt-10">
+      <div className="rise flex flex-col gap-1 mt-10" style={{ animationDelay: "760ms" }}>
         <Button size="lg" className="w-full" onClick={primary.onClick}>
           {primary.label}
         </Button>
@@ -384,7 +390,7 @@ function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
   const total = 34;
   const max = maxAllowed(total, ram);
   return (
-    <div className="min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+16px)] fade-in">
+    <div className="min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+16px)] push-in">
       <NavBar title="" onBack={onBack} />
       <div className="px-2 flex-1">
         <h1 className="m-0 text-[34px] leading-[40px] font-bold">Kuidas see arvutab</h1>
@@ -399,10 +405,14 @@ function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
           </div>
           <div className="grid grid-cols-[repeat(17,1fr)] gap-[3px] mt-4" role="img" aria-label={`${total} tundi: ${max} võid puududa, ${max + 1}. tähendab MH`}>
             {Array.from({ length: total }, (_, i) => (
-              <span key={i} className={`aspect-[3/4] rounded-[3px] ${i < max ? "bg-ok-fill" : i === max ? "bg-bad-fill" : "bg-surface-2"}`} />
+              <span
+                key={i}
+                className={`aspect-[3/4] rounded-[3px] ${i <= max ? "fill" : ""} ${i < max ? "bg-ok-fill" : i === max ? "bg-bad-fill beat" : "bg-surface-2"}`}
+                style={i <= max ? { animationDelay: `${400 + i * 110}ms` } : undefined}
+              />
             ))}
           </div>
-          <div className="mt-4 flex flex-col gap-1.5 text-[15px]">
+          <div className="rise mt-4 flex flex-col gap-1.5 text-[15px]" style={{ animationDelay: `${500 + max * 110}ms` }}>
             <span className="flex items-center gap-2">
               <i className="size-3 rounded-[3px] bg-ok-fill" /> {max} tundi võid puududa ({fmtLimit(ram.limit)} {total}-st on {(total / 4).toString().replace(".", ",")})
             </span>
@@ -412,7 +422,7 @@ function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
           </div>
         </div>
 
-        <ul className="list-none p-0 mt-7 mb-0 flex flex-col gap-4 text-[15px]">
+        <ul className="rise list-none p-0 mt-7 mb-0 flex flex-col gap-4 text-[15px]" style={{ animationDelay: `${700 + max * 110}ms` }}>
           <Fact>
             <b>Varu</b> on see, mitu tundi sul igas aines veel alles on.
           </Fact>
@@ -427,38 +437,66 @@ function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
   );
 }
 
-const TOUR: { key: keyof typeof TAB_ICONS; name: string; text: string }[] = [
+const TOUR: { key: "overview" | "history" | "settings" | "plus"; name: string; text: string }[] = [
   { key: "overview", name: "Täna", text: "Tänased tunnid ja kas võid neist puududa. Järgmine tund on esile tõstetud, üks puudutus märgib puudumise." },
-  { key: "log", name: "Lisa", text: "Märgi puudumine mõnele teisele päevale, plaani mitu päeva korraga või märgi, et tund jääb ära." },
-  { key: "history", name: "Ajalugu", text: "Kõik sissekanded. Muuda, kustuta või kleebi nimekiri Stuudiumist." },
+  { key: "plus", name: "Pluss", text: "Puudumine mõnele teisele päevale, plaan mitmeks päevaks või ärajäänud tund. Nupp on üleval paremal." },
+  { key: "history", name: "Ajalugu", text: "Kõik sissekanded. Lükka vasakule, et muuta või kustutada, või kleebi nimekiri Stuudiumist." },
   { key: "settings", name: "Seaded", text: "Tunniplaan, kool ja reegel. Siit jagad tunniplaani ka klassikaaslastega." },
 ];
+const TAB_ORDER = ["overview", "history", "settings"] as const;
 
-/** Where things live: the real tab bar, then what each tab is for. */
+/** Where things live: the real tab bar with a highlight walking across it, and what each part is for. */
 function TabsIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  const [active, setActive] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setActive((x) => (x + 1) % TOUR.length), 1700);
+    return () => clearInterval(t);
+  }, []);
+  const key = TOUR[active].key;
+  const tabIdx = TAB_ORDER.indexOf(key as (typeof TAB_ORDER)[number]);
   return (
-    <div className="min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+16px)] fade-in">
+    <div className="min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+16px)] push-in">
       <NavBar title="" onBack={onBack} />
       <div className="px-2 flex-1">
-        <h1 className="m-0 text-[34px] leading-[40px] font-bold">Kus mis on</h1>
-        <p className="mt-3 mb-0 text-[17px] text-muted">All on neli vaadet. Enamasti piisab esimesest.</p>
-        <div className="glass mt-7 rounded-full p-1 grid grid-cols-4" aria-hidden>
-          {TOUR.map((t, i) => (
-            <div key={t.key} className={`flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full ${i === 0 ? "bg-surface-2 text-accent" : "text-ink"}`}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={i === 0 ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round">
-                <path d={TAB_ICONS[t.key]} />
-              </svg>
-              <span className="text-[10px] font-medium leading-none">{t.name}</span>
-            </div>
-          ))}
-        </div>
-        <ul className="list-none p-0 mt-8 mb-0 flex flex-col gap-6">
-          {TOUR.map((t) => (
-            <li key={t.key} className="flex gap-4 items-start">
-              <span className="shrink-0 size-11 rounded-full bg-accent-soft text-accent grid place-items-center">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d={TAB_ICONS[t.key]} />
+        <h1 className="rise m-0 text-[34px] leading-[40px] font-bold">Kus mis on</h1>
+        <p className="rise mt-3 mb-0 text-[17px] text-muted" style={{ animationDelay: "80ms" }}>
+          All on kolm vaadet ja üleval pluss. Enamasti piisab esimesest.
+        </p>
+        <div className="rise mt-7 flex items-center gap-3" style={{ animationDelay: "160ms" }} aria-hidden>
+          <div className="glass flex-1 rounded-full p-1 grid grid-cols-3 relative">
+            <span
+              className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] rounded-full bg-surface-2 transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+              style={{ transform: `translateX(${Math.max(0, tabIdx) * 100}%)`, opacity: tabIdx < 0 ? 0 : 1 }}
+            />
+            {TAB_ORDER.map((k, i) => (
+              <div key={k} className={`relative flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full transition-colors duration-300 ${i === tabIdx ? "text-accent" : "text-ink"}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={i === tabIdx ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round">
+                  <path d={TAB_ICONS[k]} />
                 </svg>
+                <span className="text-[10px] font-medium leading-none">{TOUR.find((t) => t.key === k)!.name}</span>
+              </div>
+            ))}
+          </div>
+          <span className={`glass size-[62px] rounded-full grid place-items-center text-accent transition-transform duration-300 ${key === "plus" ? "scale-110" : ""}`}>
+            <Icon name="plus" size={26} stroke={2.4} />
+          </span>
+        </div>
+        <ul className="list-none p-0 mt-8 mb-0 flex flex-col gap-2">
+          {TOUR.map((t, i) => (
+            <li
+              key={t.key}
+              onClick={() => setActive(i)}
+              className={`rise flex gap-4 items-start rounded-[20px] p-3 -mx-1 transition-colors duration-300 cursor-pointer ${i === active ? "bg-surface" : ""}`}
+              style={{ animationDelay: `${260 + i * 100}ms` }}
+            >
+              <span className={`shrink-0 size-11 rounded-full grid place-items-center transition-colors duration-300 ${i === active ? "bg-accent text-accent-ink" : "bg-accent-soft text-accent"}`}>
+                {t.key === "plus" ? (
+                  <Icon name="plus" size={22} stroke={2.4} />
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d={TAB_ICONS[t.key]} />
+                  </svg>
+                )}
               </span>
               <div>
                 <div className="font-semibold text-[17px]">{t.name}</div>
@@ -468,7 +506,7 @@ function TabsIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
           ))}
         </ul>
       </div>
-      <Button size="lg" className="w-full mt-10" onClick={onNext}>
+      <Button size="lg" className="rise w-full mt-8" style={{ animationDelay: "700ms" }} onClick={onNext}>
         Alusta
       </Button>
     </div>
@@ -490,7 +528,7 @@ function Start({ onRam9b, onCode, onSetup, onIntro }: { onRam9b: () => void; onC
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   return (
-    <div className="flex flex-col gap-7 pt-[calc(env(safe-area-inset-top)+40px)] fade-in">
+    <div className="flex flex-col gap-7 pt-[calc(env(safe-area-inset-top)+40px)] push-in">
       <div className="px-2">
         <h1 className="m-0 text-[34px] leading-[40px] font-bold">Alustame</h1>
         <p className="mt-2 mb-0 text-[17px] text-muted">Vali, kuidas oma tunniplaani saad.</p>

@@ -1,4 +1,5 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type PointerEvent as RPointerEvent, type ReactNode } from "react";
 import { fractionToPct } from "../core/calc";
 import type { Fraction, Rule, Status } from "../core/types";
 
@@ -56,6 +57,16 @@ const ICONS = {
   lock: "M7 11V8a5 5 0 0 1 10 0v3M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z",
   share: "M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6",
   more: "M5 12h.01M12 12h.01M19 12h.01",
+  book: "M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Zm0 16a2 2 0 0 1 2-2h13v2",
+  grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  download: "M12 4v11M7 10l5 5 5-5M5 20h14",
+  archive: "M3 5h18v4H3zM5 9v10h14V9M10 13h4",
+  flask: "M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3M7.5 15h9",
+  building: "M4 21V8l8-5 8 5v13M9 21v-6h6v6M3 21h18",
+  calendarX: "M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm5 8 4 4m0-4-4 4",
+  trash: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13",
+  pencil: "M4 20h4L19 9l-4-4L4 16v4Z",
+  tray: "M4 13h4l2 3h4l2-3h4M4 13l2-8h12l2 8v6H4v-6Z",
 } as const;
 export type IconName = keyof typeof ICONS;
 
@@ -76,13 +87,30 @@ export function Icon({ name, size = 20, stroke = 2 }: { name: IconName; size?: n
 
 /* ---------- Layout: nav bars and inset grouped lists ---------- */
 
-/** iOS large title. */
-export function LargeTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+/** iOS large title, with an optional trailing control (e.g. the + button). */
+export function LargeTitle({ title, subtitle, trailing }: { title: string; subtitle?: string; trailing?: ReactNode }) {
   return (
-    <header className="px-4 pt-2 pb-1">
-      <h1 className="m-0 text-[34px] leading-[41px] font-bold tracking-[0.01em]">{title}</h1>
-      {subtitle && <div className="text-[15px] text-muted -mt-0.5">{subtitle}</div>}
+    <header className="px-4 pt-2 pb-1 flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="m-0 text-[34px] leading-[41px] font-bold tracking-[0.01em]">{title}</h1>
+        {subtitle && <div className="text-[15px] text-muted -mt-0.5 truncate">{subtitle}</div>}
+      </div>
+      {trailing && <div className="shrink-0 pb-1">{trailing}</div>}
     </header>
+  );
+}
+
+/** Round glass + button for nav bars (iOS 26 contained bar button). */
+export function PlusButton({ onClick, label = "Lisa puudumine", small }: { onClick: () => void; label?: string; small?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={`glass rounded-full grid place-items-center text-accent cursor-pointer active:scale-95 transition-transform ${small ? "size-9" : "size-11"}`}
+    >
+      <Icon name="plus" size={small ? 20 : 24} stroke={2.4} />
+    </button>
   );
 }
 
@@ -294,11 +322,296 @@ export function Meter({ pct: p, planPct = 0, limitPct, status, label }: { pct: n
   );
 }
 
-export function Empty({ title, children }: { title: string; children?: ReactNode }) {
+/** Apple's "nothing here yet": large grey symbol, title, one line, optional action. */
+export function Empty({ title, children, icon = "tray", action }: { title: string; children?: ReactNode; icon?: IconName; action?: ReactNode }) {
   return (
-    <div className="text-center py-8 px-4 flex flex-col gap-1.5 items-center">
-      <div className="font-semibold text-[17px]">{title}</div>
-      {children && <div className="text-muted text-[15px] max-w-[36ch]">{children}</div>}
+    <div className="text-center py-10 px-4 flex flex-col gap-2 items-center">
+      <span className="text-faint mb-1">
+        <Icon name={icon} size={52} stroke={1.6} />
+      </span>
+      <div className="font-bold text-[22px] leading-tight">{title}</div>
+      {children && <div className="text-muted text-[15px] max-w-[34ch]">{children}</div>}
+      {action && <div className="mt-2">{action}</div>}
+    </div>
+  );
+}
+
+/** iOS Settings-style icon: white glyph on a small coloured rounded square. */
+export function SettingsIcon({ name, color }: { name: IconName; color: string }) {
+  return (
+    <span className="shrink-0 size-[30px] rounded-[8px] grid place-items-center text-white" style={{ background: color }} aria-hidden>
+      <Icon name={name} size={18} stroke={2.2} />
+    </span>
+  );
+}
+
+/* ---------- Sheets, action sheets, swipe rows, long press ---------- */
+
+/** Mount while open plus an exit animation. */
+function usePresence(open: boolean, ms = 300) {
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const r = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
+      return () => cancelAnimationFrame(r);
+    }
+    setShown(false);
+    const t = setTimeout(() => setMounted(false), ms);
+    return () => clearTimeout(t);
+  }, [open, ms]);
+  return { mounted, shown };
+}
+
+let sheetsOpen = 0;
+/** While a sheet is open the page behind recedes (scaled, dimmed) and does not scroll, as on iOS. */
+function useRecede(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    sheetsOpen++;
+    document.documentElement.classList.add("sheet-open");
+    return () => {
+      sheetsOpen--;
+      if (!sheetsOpen) document.documentElement.classList.remove("sheet-open");
+    };
+  }, [active]);
+}
+
+/**
+ * iOS sheet: rises from the bottom, the page behind recedes, swipe the grabber or header down
+ * to dismiss. `leading` defaults to a Loobu button.
+ */
+export function Sheet({
+  open,
+  onClose,
+  title,
+  trailing,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  trailing?: ReactNode;
+  children: ReactNode;
+}) {
+  const { mounted, shown } = usePresence(open);
+  const [drag, setDrag] = useState(0);
+  const start = useRef<{ y: number; t: number } | null>(null);
+  useRecede(open);
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [open, onClose]);
+  if (!mounted) return null;
+  const down = (e: RPointerEvent) => {
+    start.current = { y: e.clientY, t: Date.now() };
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  };
+  const move = (e: RPointerEvent) => start.current && setDrag(Math.max(0, e.clientY - start.current.y));
+  const up = () => {
+    if (!start.current) return;
+    const fast = drag / Math.max(1, Date.now() - start.current.t) > 0.6;
+    start.current = null;
+    if (drag > 120 || (fast && drag > 40)) onClose();
+    setDrag(0);
+  };
+  // Rendered at the top of the page so the receding page and the tab bar never cover it.
+  return createPortal(
+    <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
+      <div
+        className="sheet absolute inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+30px)] max-w-[640px] mx-auto bg-bg rounded-t-[26px] shadow-[0_-10px_40px_rgb(0_0_0/0.25)] flex flex-col overflow-hidden"
+        style={{ transform: shown ? `translateY(${drag}px)` : "translateY(100%)", transition: drag ? "none" : undefined }}
+      >
+        <div className="shrink-0 touch-none cursor-grab" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+          <div className="mx-auto mt-2 h-[5px] w-9 rounded-full bg-faint" aria-hidden />
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 pt-1.5 pb-2 min-h-12">
+            <button type="button" onClick={onClose} className="justify-self-start text-accent text-[17px] min-h-11 pr-3 cursor-pointer">
+              Loobu
+            </button>
+            <div className="font-semibold text-[17px] truncate">{title}</div>
+            <div className="justify-self-end">{trailing}</div>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-7">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+export interface SheetAction {
+  label: ReactNode;
+  onClick: () => void;
+  destructive?: boolean;
+  bold?: boolean;
+}
+
+/** iOS action sheet: a group of choices and a separate Loobu, sliding up from the bottom. */
+export function ActionSheet({ open, onClose, title, message, actions }: { open: boolean; onClose: () => void; title?: string; message?: string; actions: SheetAction[] }) {
+  const { mounted, shown } = usePresence(open, 260);
+  if (!mounted) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title ?? "Valikud"}>
+      <div className={`absolute inset-0 bg-black/35 transition-opacity duration-200 ${shown ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
+      <div
+        className="sheet absolute inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+8px)] max-w-[480px] mx-auto flex flex-col gap-2"
+        style={{ transform: shown ? "translateY(0)" : "translateY(110%)" }}
+      >
+        <div className="glass rounded-[16px] overflow-hidden">
+          {(title || message) && (
+            <div className="px-4 py-3 text-center border-b border-line">
+              {title && <div className="text-[13px] font-semibold text-muted">{title}</div>}
+              {message && <div className="text-[13px] text-muted mt-0.5">{message}</div>}
+            </div>
+          )}
+          {actions.map((a, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                onClose();
+                a.onClick();
+              }}
+              className={`w-full min-h-[56px] px-4 text-[19px] cursor-pointer active:bg-surface-2 ${i ? "border-t border-line" : ""} ${a.destructive ? "text-bad" : "text-accent"} ${a.bold ? "font-semibold" : ""}`}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={onClose} className="glass w-full min-h-[56px] rounded-[16px] text-[19px] font-semibold text-accent cursor-pointer active:bg-surface-2">
+          Loobu
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Long press (and right-click) opens a context menu; a moving finger cancels it. */
+export function useLongPress(onLong: () => void, ms = 480) {
+  const t = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const at = useRef<{ x: number; y: number } | null>(null);
+  const clear = () => {
+    if (t.current) clearTimeout(t.current);
+    t.current = null;
+  };
+  return {
+    onPointerDown: (e: RPointerEvent) => {
+      at.current = { x: e.clientX, y: e.clientY };
+      clear();
+      t.current = setTimeout(onLong, ms);
+    },
+    onPointerMove: (e: RPointerEvent) => {
+      if (at.current && Math.hypot(e.clientX - at.current.x, e.clientY - at.current.y) > 8) clear();
+    },
+    onPointerUp: clear,
+    onPointerCancel: clear,
+    onContextMenu: (e: { preventDefault: () => void }) => {
+      e.preventDefault();
+      clear();
+      onLong();
+    },
+  };
+}
+
+export interface SwipeAction {
+  label: string;
+  icon?: IconName;
+  tone: "red" | "gray" | "blue" | "orange";
+  onClick: () => void;
+}
+const SWIPE_TONE = { red: "bg-bad-fill", gray: "bg-[#8e8e93]", blue: "bg-[#0a84ff]", orange: "bg-warn-fill" };
+
+/** Mail-style swipe actions: drag a row left to reveal buttons; a tap elsewhere closes it. */
+export function SwipeRow({ actions, children, className = "", ...rest }: { actions: SwipeAction[]; children: ReactNode; className?: string } & Record<string, unknown>) {
+  const W = actions.length * 80;
+  const [x, setX] = useState(0);
+  const [openRow, setOpenRow] = useState(false);
+  const g = useRef<{ x: number; y: number; base: number; lock?: "h" | "v" } | null>(null);
+  const moved = useRef(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+  // As on iOS, any touch outside an open row closes it.
+  useEffect(() => {
+    if (!openRow) return;
+    const away = (e: PointerEvent) => {
+      if (rowRef.current && !rowRef.current.contains(e.target as Node)) {
+        setOpenRow(false);
+        setX(0);
+      }
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [openRow]);
+  const down = (e: RPointerEvent) => {
+    g.current = { x: e.clientX, y: e.clientY, base: openRow ? -W : 0 };
+    moved.current = false;
+  };
+  const move = (e: RPointerEvent) => {
+    const s = g.current;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (!s.lock && Math.hypot(dx, dy) > 8) {
+      s.lock = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+      // Keep receiving the gesture even when the finger or cursor leaves the row.
+      if (s.lock === "h") (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    }
+    if (s.lock !== "h") return;
+    moved.current = true;
+    setX(Math.min(0, Math.max(-W - 40, s.base + dx)));
+  };
+  const up = () => {
+    const s = g.current;
+    g.current = null;
+    if (!s || s.lock !== "h") return;
+    const o = x < -W / 2;
+    setOpenRow(o);
+    setX(o ? -W : 0);
+  };
+  return (
+    <div ref={rowRef} className={`cell relative overflow-hidden ${className}`} {...rest}>
+      <div className="absolute inset-y-0 right-0 flex" style={{ width: W }} aria-hidden={!openRow}>
+        {actions.map((a) => (
+          <button
+            key={a.label}
+            type="button"
+            tabIndex={openRow ? 0 : -1}
+            onClick={() => {
+              setOpenRow(false);
+              setX(0);
+              a.onClick();
+            }}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 text-white text-[13px] font-medium cursor-pointer ${SWIPE_TONE[a.tone]}`}
+          >
+            {a.icon && <Icon name={a.icon} size={20} />}
+            {a.label}
+          </button>
+        ))}
+      </div>
+      <div
+        className="relative bg-surface touch-pan-y select-none"
+        style={{ transform: `translateX(${x}px)`, transition: g.current ? "none" : "transform 260ms cubic-bezier(0.2,0.8,0.2,1)" }}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+        onClickCapture={(e) => {
+          if (moved.current || openRow) {
+            e.stopPropagation();
+            e.preventDefault();
+            if (openRow && !moved.current) {
+              setOpenRow(false);
+              setX(0);
+            }
+          }
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
