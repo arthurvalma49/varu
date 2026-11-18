@@ -189,15 +189,15 @@ export function Overview({
                 );
               if (cancelled)
                 return (
-                  <div key={i} className="cell flex items-center gap-3 px-5 min-h-[60px]">
+                  <div key={i} className="cell flex items-center gap-2 pl-5 pr-3 min-h-[60px]">
                     <SlotLabel slot={b.slot} time={t?.start} past />
-                    <div className="flex-1 min-w-0 py-2">
+                    <div className="flex-1 min-w-0 py-2 pl-1">
                       <div className="truncate text-muted line-through decoration-1">{name(b.subjectId)}</div>
-                      <div className="text-[13px] text-muted">Jääb ära · ei loe puudumiseks</div>
+                      <div className="text-[13px] text-muted truncate">Jääb ära</div>
                     </div>
                     <Button
                       variant="quiet"
-                      className="shrink-0 min-h-9 px-3 text-[15px]"
+                      className="shrink-0 min-h-9 min-w-[86px] px-3.5 text-[15px] mr-11"
                       onClick={() => onCancel(focus, { [b.subjectId]: -cancelled }, `${name(b.subjectId)} toimub siiski.`)}
                     >
                       Taasta
@@ -282,7 +282,7 @@ export function Overview({
                       <>
                         <Button
                           variant={ok || oneOnly ? "ghost" : "quiet"}
-                          className={`shrink-0 min-h-9 px-3.5 text-[15px] ${ok || oneOnly ? "" : "text-bad"}`}
+                          className={`shrink-0 min-h-9 min-w-[86px] px-3.5 text-[15px] ${ok || oneOnly ? "" : "text-bad"}`}
                           onClick={skip}
                           aria-label={`Puudun: ${name(b.subjectId)} ${b.slot}`}
                         >
@@ -308,6 +308,31 @@ export function Overview({
               <span className={v && v.blockers.length ? "text-bad" : "text-accent"}>{partial ? "Puudun ülejäänud tundidest" : "Puudun terve päeva"}</span>
             </Row>
           )}
+          {(() => {
+            // A visible way in for cancelled lessons (also on swipe and long press).
+            const cancelled = setup.cancelled?.[focus] ?? {};
+            const left = timetableOn(setup, focus).filter((b) => !b.selfStudy).map((b) => ({ b, n: b.count - Math.min(cancelled[b.subjectId] ?? 0, b.count) })).filter((x) => x.n > 0);
+            if (!left.length) return null;
+            const actions: SheetAction[] = left.map(({ b, n }) => {
+              const tm = lessonTimes(setup, b);
+              return { label: `${name(b.subjectId)}${tm ? `, ${tm.start}` : ""}`, onClick: () => onCancel(focus, { [b.subjectId]: n }, `${name(b.subjectId)} jääb ära.`) };
+            });
+            if (left.length > 1)
+              actions.push({
+                label: "Kõik tunnid jäävad ära",
+                bold: true,
+                onClick: () => {
+                  const all: Record<string, number> = {};
+                  for (const { b, n } of left) all[b.subjectId] = (all[b.subjectId] ?? 0) + n;
+                  onCancel(focus, all, `${dayWord} jääb ära.`);
+                },
+              });
+            return (
+              <Row onClick={() => setSheet({ title: "Mis tund jääb ära?", message: "Ärajäänud tund ei ole puudumine. Aine tundide koguarv väheneb.", actions })}>
+                <span className="text-accent">Tund jääb ära…</span>
+              </Row>
+            );
+          })()}
         </Section>
       )}
 

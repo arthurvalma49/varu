@@ -9,7 +9,7 @@ import { demoData } from "../core/demo";
 import { emptyTimetable, slug } from "../core/templates";
 import type { AppData, Setup } from "../core/types";
 import type { Store } from "../store";
-import { ActionSheet, Button, Check, Icon, LargeTitle, NavBar, Row, Section, Segmented, SettingsIcon, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
+import { ActionSheet, Button, Check, DateField, Icon, LargeTitle, NavBar, Row, Section, Segmented, SettingsIcon, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
 import { eduSegments } from "../core/edupage";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
@@ -301,10 +301,7 @@ function RulePage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }) {
 
 function DateRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-      <span>{label}</span>
-      <input type="date" className="num bg-surface-2 rounded-full px-3 py-1.5 border-0 text-[17px]" value={value} onChange={(e) => isValidISO(e.target.value) && onChange(e.target.value)} />
-    </label>
+    <DateField label={label} value={value} onChange={(v) => isValidISO(v) && onChange(v)} />
   );
 }
 
@@ -523,20 +520,15 @@ function HolidaysPage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }
             <span className="text-muted text-[15px] num"> · {r.days.length} p</span>
           </Row>
         ))}
-        <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <input type="date" aria-label="Vaba päev" className="num bg-surface-2 rounded-full px-3 py-1.5 border-0 text-[17px]" value={v} onChange={(e) => setV(e.target.value)} />
-          <Button
-            variant="ghost"
-            className="min-h-8 px-3"
-            disabled={!isValidISO(v)}
-            onClick={() => {
-              updateSetup((s) => void (!s.holidays.includes(v) && (s.holidays.push(v), s.holidays.sort())));
-              setV("");
-            }}
-          >
-            Lisa
-          </Button>
-        </div>
+        <DateField
+          label="Lisa päev"
+          value={v}
+          onChange={(d) => {
+            if (!isValidISO(d)) return;
+            updateSetup((s) => void (!s.holidays.includes(d) && (s.holidays.push(d), s.holidays.sort())));
+            setV("");
+          }}
+        />
       </Section>
       {Object.keys(setup.cancelled ?? {}).length > 0 && (
         <Section title="Ärajäänud tunnid" info="Need tunnid ei toimunud või ei toimu. Need vähendavad aine tundide koguarvu, aga ei ole puudumised.">

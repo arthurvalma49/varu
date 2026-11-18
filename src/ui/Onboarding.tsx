@@ -7,7 +7,7 @@ import { eduSegments } from "../core/edupage";
 import { decodeSetup } from "../core/share";
 import { emptyTimetable, ram9bTemplate } from "../core/templates";
 import type { Absence, Setup } from "../core/types";
-import { Button, Check, Icon, NavBar, Row, Section, Stepper, Switch, TAB_ICONS, fmtLimit, limitPhrase, tunde, type IconName } from "./kit";
+import { Button, Check, DateField, Icon, NavBar, Row, Section, Stepper, Switch, TAB_ICONS, fmtLimit, limitPhrase, tunde, type IconName } from "./kit";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
 
@@ -259,17 +259,13 @@ export function Onboarding({
               />
             </div>
             {lateStart && (
-              <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-                <span>Kehtib alates</span>
-                <input
-                  type="date"
-                  className="num bg-surface-2 rounded-full px-3 py-1.5 border-0 text-[17px]"
-                  min={draft.window.start}
-                  max={draft.window.end}
-                  value={draft.timetableFrom}
-                  onChange={(e) => isValidISO(e.target.value) && patch({ timetableFrom: e.target.value })}
-                />
-              </label>
+              <DateField
+                label="Kehtib alates"
+                min={draft.window.start}
+                max={draft.window.end}
+                value={draft.timetableFrom}
+                onChange={(v) => isValidISO(v) && patch({ timetableFrom: v })}
+              />
             )}
           </Section>
           )}
@@ -438,7 +434,7 @@ function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
 }
 
 const TOUR: { key: "overview" | "history" | "settings" | "plus"; name: string; text: string }[] = [
-  { key: "overview", name: "Täna", text: "Tänased tunnid ja kas võid neist puududa. Järgmine tund on esile tõstetud, üks puudutus märgib puudumise." },
+  { key: "overview", name: "Täna", text: "Tänased tunnid ja kas võid neist puududa. Üks puudutus märgib puudumise. Kui tund jääb ära, märgi ka see: siis on aine tunde vähem." },
   { key: "plus", name: "Pluss", text: "Puudumine mõnele teisele päevale, plaan mitmeks päevaks või ärajäänud tund. Nupp on üleval paremal." },
   { key: "history", name: "Ajalugu", text: "Kõik sissekanded. Lükka vasakule, et muuta või kustutada, või kleebi nimekiri Stuudiumist." },
   { key: "settings", name: "Seaded", text: "Tunniplaan, kool ja reegel. Siit jagad tunniplaani ka klassikaaslastega." },
@@ -628,24 +624,8 @@ function SchoolStep({ draft, today, patch }: { draft: SetupDraft; today: string;
           <span>Nimi</span>
           <input className="bg-transparent border-0 text-right text-muted text-[17px] w-1/2" aria-label="Perioodi nimi" value={draft.window.name} onChange={(e) => patch({ window: { ...draft.window, name: e.target.value } })} />
         </label>
-        <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>Algus</span>
-          <input
-            type="date"
-            className="num bg-surface-2 rounded-full px-3 py-1.5 border-0 text-[17px]"
-            value={draft.window.start}
-            onChange={(e) => isValidISO(e.target.value) && patch({ window: { ...draft.window, start: e.target.value }, timetableFrom: e.target.value })}
-          />
-        </label>
-        <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>Viimane päev</span>
-          <input
-            type="date"
-            className="num bg-surface-2 rounded-full px-3 py-1.5 border-0 text-[17px]"
-            value={draft.window.end}
-            onChange={(e) => isValidISO(e.target.value) && patch({ window: { ...draft.window, end: e.target.value } })}
-          />
-        </label>
+        <DateField label="Algus" value={draft.window.start} onChange={(v) => isValidISO(v) && patch({ window: { ...draft.window, start: v }, timetableFrom: v })} />
+        <DateField label="Viimane päev" min={draft.window.start} value={draft.window.end} onChange={(v) => isValidISO(v) && patch({ window: { ...draft.window, end: v } })} />
       </Section>
     </>
   );

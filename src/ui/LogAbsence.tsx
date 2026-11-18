@@ -3,7 +3,7 @@ import { inWindow, lessonTimes, lessonsOn, missableOn, preview, segmentFor, stat
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow } from "../core/types";
 import { newId } from "../store";
-import { Button, Check, Icon, Pill, Row, Section, Segmented, Switch, WD_LONG, cap, fmtDate, joinEt, leftLabel, pct, tunde } from "./kit";
+import { Button, Check, DateField, Icon, Pill, Row, Section, Segmented, Switch, WD_LONG, cap, fmtDate, joinEt, leftLabel, pct, tunde } from "./kit";
 
 type DayPick = "today" | "tomorrow" | "other";
 
@@ -183,33 +183,16 @@ export function LogAbsence({
             ]}
           />
         </div>
-        <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>{multi ? "Alates" : cap(WD_LONG[wd])}</span>
-          <input
-            type="date"
-            aria-label="Kuupäev"
-            className="num bg-surface-2 rounded-full px-3 py-1.5 text-[17px] border-0 text-accent"
-            value={date}
-            onChange={(e) => {
-              setPick(e.target.value === now ? "today" : e.target.value === tomorrow ? "tomorrow" : "other");
-              changeDate(e.target.value);
-              if (e.target.value > until) setUntil(e.target.value);
-            }}
-          />
-        </label>
-        {multi && (
-          <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-            <span>Kuni</span>
-            <input
-              type="date"
-              aria-label="Kuni"
-              min={date}
-              className="num bg-surface-2 rounded-full px-3 py-1.5 text-[17px] border-0 text-accent"
-              value={until}
-              onChange={(e) => e.target.value && setUntil(e.target.value)}
-            />
-          </label>
-        )}
+        <DateField
+          label={multi ? "Alates" : cap(WD_LONG[wd])}
+          value={date}
+          onChange={(v) => {
+            setPick(v === now ? "today" : v === tomorrow ? "tomorrow" : "other");
+            changeDate(v);
+            if (v > until) setUntil(v);
+          }}
+        />
+        {multi && <DateField label="Kuni" min={date} value={until} onChange={setUntil} />}
         {!cancelMode && (
           <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
             <span>Mitu päeva</span>

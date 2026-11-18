@@ -684,3 +684,141 @@ export function dateRuns(dates: string[]): { start: string; end: string; days: s
   }
   return out;
 }
+
+/* ---------- Dates ---------- */
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const isoOf = (y: number, m: number, d: number) => `${y}-${pad2(m + 1)}-${pad2(d)}`;
+function todayIso() {
+  const t = new Date();
+  return isoOf(t.getFullYear(), t.getMonth(), t.getDate());
+}
+
+/**
+ * A date row with an inline calendar that opens right under it, like the inline UIDatePicker in
+ * iOS Settings and Calendar (instead of the browser's floating picker, which covers the list).
+ */
+export function DateField({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  placeholder = "Vali kuupäev",
+  trailing,
+}: {
+  label?: ReactNode;
+  value: string;
+  onChange: (v: string) => void;
+  min?: string;
+  max?: string;
+  placeholder?: string;
+  trailing?: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const { mounted, shown } = usePresence(open, 450);
+  const shownValue = value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+  return (
+    <div className="cell">
+      <div className="flex items-center justify-between gap-3 px-5 min-h-[52px]">
+        {label !== undefined && <span className="min-w-0">{label}</span>}
+        <span className="flex items-center gap-2 ml-auto">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-label={`${typeof label === "string" ? label + ": " : ""}${shownValue ? fmtDate(shownValue, true) : placeholder}`}
+            onClick={() => setOpen((o) => !o)}
+            className={`tap num rounded-full px-3 py-1.5 text-[17px] cursor-pointer transition-colors duration-200 ${open ? "bg-accent-soft text-accent" : shownValue ? "bg-surface-2 text-ink" : "bg-surface-2 text-muted"}`}
+          >
+            {shownValue ? fmtDate(shownValue, true) : placeholder}
+          </button>
+          {trailing}
+        </span>
+      </div>
+      <div
+        className="grid transition-[grid-template-rows] duration-(--dur-smooth) ease-(--spring-smooth) motion-reduce:transition-none"
+        style={{ gridTemplateRows: shown ? "1fr" : "0fr" }}
+      >
+        <div className="min-h-0 overflow-hidden">
+          {mounted && (
+            <Calendar
+              value={shownValue}
+              min={min}
+              max={max}
+              onPick={(v) => {
+                onChange(v);
+                setOpen(false);
+              }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CAL_WD = ["E", "T", "K", "N", "R", "L", "P"];
+
+function Calendar({ value, min, max, onPick }: { value: string; min?: string; max?: string; onPick: (v: string) => void }) {
+  const today = todayIso();
+  const start = value || (min && min > today ? min : max && max < today ? max : today);
+  const [ym, setYm] = useState(() => ({ y: Number(start.slice(0, 4)), m: Number(start.slice(5, 7)) - 1 }));
+  const first = new Date(ym.y, ym.m, 1);
+  const lead = (first.getDay() + 6) % 7; // Monday first
+  const days = new Date(ym.y, ym.m + 1, 0).getDate();
+  const step = (k: number) => setYm(({ y, m }) => ({ y: m + k < 0 ? y - 1 : m + k > 11 ? y + 1 : y, m: (m + k + 12) % 12 }));
+  const canPrev = !min || isoOf(ym.y, ym.m, 1) > min;
+  const canNext = !max || isoOf(ym.y, ym.m, days) < max;
+  return (
+    <div className="px-3 pb-3 pt-1">
+      <div className="flex items-center justify-between pl-2 pb-1">
+        <span className="font-semibold text-[17px]">
+          {cap(MON_LONG[ym.m])} {ym.y}
+        </span>
+        <span className="flex">
+          <button type="button" aria-label="Eelmine kuu" disabled={!canPrev} onClick={() => step(-1)} className="tap size-11 grid place-items-center text-accent cursor-pointer disabled:opacity-30">
+            <Icon name="left" size={22} stroke={2.4} />
+          </button>
+          <button type="button" aria-label="Järgmine kuu" disabled={!canNext} onClick={() => step(1)} className="tap size-11 grid place-items-center text-accent cursor-pointer disabled:opacity-30">
+            <Icon name="right" size={22} stroke={2.4} />
+          </button>
+        </span>
+      </div>
+      <div className="grid grid-cols-7 text-center text-[13px] font-semibold text-faint pb-1" aria-hidden>
+        {CAL_WD.map((d) => (
+          <span key={d}>{d}</span>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-y-0.5" role="grid" aria-label={`${cap(MON_LONG[ym.m])} ${ym.y}`}>
+        {Array.from({ length: lead }, (_, i) => (
+          <span key={`l${i}`} />
+        ))}
+        {Array.from({ length: days }, (_, i) => {
+          const iso = isoOf(ym.y, ym.m, i + 1);
+          const off = (!!min && iso < min) || (!!max && iso > max);
+          const sel = iso === value;
+          const isToday = iso === today;
+          return (
+            <button
+              key={iso}
+              type="button"
+              disabled={off}
+              aria-pressed={sel}
+              aria-label={fmtDate(iso, true)}
+              onClick={() => onPick(iso)}
+              className="group grid place-items-center h-11 cursor-pointer disabled:cursor-default"
+            >
+              <span
+                className={`num size-10 grid place-items-center rounded-full text-[19px] transition-colors duration-150 ${
+                  sel ? "bg-accent text-accent-ink font-semibold" : off ? "text-faint" : isToday ? "text-accent font-semibold group-active:bg-surface-2" : "group-active:bg-surface-2"
+                }`}
+              >
+                {i + 1}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
