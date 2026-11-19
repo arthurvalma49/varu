@@ -4,7 +4,7 @@ import { inWindow, lessonTimes, lessonsOn, missableOn, preview, segmentFor, stat
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow } from "../core/types";
 import { newId } from "../store";
-import { Button, Check, DateField, DateRangeField, Icon, Pill, Row, Section, Segmented, Switch, WD_LONG, cap, fmtDate, joinEt, leftLabel, pct, tunde } from "./kit";
+import { ActionSheet, Button, Check, DateField, DateRangeField, Icon, Pill, Row, Section, Segmented, Switch, WD_LONG, cap, fmtDate, joinEt, leftLabel, pct, tunde } from "./kit";
 
 type DayPick = "today" | "tomorrow" | "other";
 
@@ -19,6 +19,7 @@ export function LogAbsence({
   onSave,
   onSaveMany,
   onCancel,
+  onUnlog,
   inSheet,
 }: {
   /** Shown inside the Lisa sheet: the save bar sits at the sheet's bottom, not above a tab bar. */
@@ -30,7 +31,11 @@ export function LogAbsence({
   onSave: (a: Absence) => void;
   onSaveMany: (a: Absence[]) => void;
   onCancel: (date: string, changes: Record<string, number>, label: string) => void;
+  /** Takes already logged lessons of a subject off that day again. */
+  onUnlog: (date: string, subjectId: string, count: number) => void;
 }) {
+  /** Block whose logged lessons the user tapped, to offer removing them. */
+  const [unlogIdx, setUnlogIdx] = useState<number | null>(null);
   /** "absent": I miss lessons. "cancel": lessons do not take place (lowers the totals). */
   const [mode, setMode] = useState<"absent" | "cancel">("absent");
   const [cancelPick, setCancelPick] = useState<Set<number>>(new Set());
@@ -322,13 +327,18 @@ export function LogAbsence({
                 </div>
               </Row>
             ) : openCount(i) <= 0 ? (
-              <div key={i} className="cell flex items-center gap-3 pl-5 pr-4 min-h-[52px]">
+              <div key={i} className="cell flex items-center gap-3 pl-5 pr-2.5 min-h-[52px]">
                 <span className="num text-[15px] text-muted w-12 shrink-0">{lessonTimes(setup, b)?.start ?? `${b.slot}.`}</span>
                 <span className="flex-1 min-w-0 truncate text-muted">{name(b.subjectId)}</span>
-                <span className="shrink-0 flex items-center gap-1 text-[15px] text-ok">
+                <button
+                  type="button"
+                  onClick={() => setUnlogIdx(i)}
+                  aria-label={`${name(b.subjectId)}: kirjas, muuda`}
+                  className="tap shrink-0 flex items-center gap-1.5 min-h-8 px-3 rounded-full bg-ok-soft text-ok text-[15px] font-semibold cursor-pointer"
+                >
                   <Icon name="check" size={16} stroke={2.6} />
-                  kirjas
-                </span>
+                  Kirjas
+                </button>
               </div>
             ) : (
               <div key={i} className="cell flex items-center pr-3">
@@ -464,6 +474,23 @@ export function LogAbsence({
           </>
         )}
       </div>
+      <ActionSheet
+        open={unlogIdx !== null}
+        onClose={() => setUnlogIdx(null)}
+        title={unlogIdx !== null && blocks[unlogIdx] ? `${name(blocks[unlogIdx].subjectId)}, ${fmtDate(date)}` : undefined}
+        message="Kirjas puudumisena"
+        actions={
+          unlogIdx !== null && blocks[unlogIdx]
+            ? [
+                {
+                  label: loggedPerBlock[unlogIdx] > 1 ? "Eemalda puudumine (mõlemad tunnid)" : "Eemalda puudumine",
+                  destructive: true,
+                  onClick: () => onUnlog(date, blocks[unlogIdx].subjectId, loggedPerBlock[unlogIdx]),
+                },
+              ]
+            : []
+        }
+      />
     </>
   );
 }

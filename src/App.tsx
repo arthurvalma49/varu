@@ -324,6 +324,7 @@ export default function App() {
           now={now}
           onSave={logged}
           onSaveMany={loggedMany}
+          onUnlog={unlogLesson}
           onCancel={(date, changes, label) => {
             changeCancelled(date, changes, label);
             setLisaOpen(false);

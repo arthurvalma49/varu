@@ -6,11 +6,25 @@ test("Lisa shows lessons already logged as done and saves only the rest", async 
   await page.getByRole("button", { name: /^Puudun: Hispaania/ }).click();
   await page.getByRole("button", { name: "Puudun mõlemast" }).click();
   await page.getByRole("button", { name: "Lisa puudumine" }).first().click();
-  await expect(page.getByText("kirjas", { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Lisa" }).getByRole("button", { name: "Hispaania keel: kirjas, muuda" })).toBeVisible();
   await page.getByRole("button", { name: "Salvesta" }).click();
   const saved = await absences(page);
   expect(saved).toHaveLength(2);
   expect(saved[1].lessons["hispaania-keel"]).toBeUndefined();
+});
+
+test("a lesson already logged can be removed from the Lisa sheet", async ({ page }) => {
+  await openDemo(page);
+  await page.getByRole("button", { name: /^Puudun: Hispaania/ }).click();
+  await page.getByRole("button", { name: "Puudun mõlemast" }).click();
+  expect(await absences(page)).toHaveLength(1);
+  await page.getByRole("button", { name: "Lisa puudumine" }).first().click();
+  const lisa = page.getByRole("dialog", { name: "Lisa" });
+  await lisa.getByRole("button", { name: "Hispaania keel: kirjas, muuda" }).click();
+  await page.getByRole("button", { name: "Eemalda puudumine (mõlemad tunnid)" }).click();
+  expect(await absences(page)).toHaveLength(0);
+  // The lesson is back as one that can be ticked.
+  await expect(lisa.getByRole("checkbox", { name: /Hispaania keel/ })).toBeVisible();
 });
 
 test("several days: tap first and last day, school days only are saved", async ({ page }) => {
