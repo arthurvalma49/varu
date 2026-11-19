@@ -147,7 +147,7 @@ export function Overview({
                 : v.tightest
                   ? v.tightest.leftAfter === 0
                     ? `Pärast seda on ${name(v.tightest.subjectId)} piiril.`
-                    : `${v.tightest.leftAfter >= 5 ? "Varu on küllaga. " : ""}Pärast seda jääb kõige vähem: ${name(v.tightest.subjectId)}, ${tunde(v.tightest.leftAfter)}.`
+                    : `Vähim varu pärast: ${name(v.tightest.subjectId)}, ${tunde(v.tightest.leftAfter)}.`
                   : "Selles päevas pole arvestatavaid tunde."}
             </p>
           </>
@@ -166,12 +166,12 @@ export function Overview({
           </>
         )}
         {over.length > 0 && (
-          <div className="mt-2 rounded-[18px] bg-bad-soft px-4 py-3 flex gap-3 items-start">
-            <span className="text-bad mt-0.5">
+          <div className="mt-2 rounded-[18px] bg-bad-soft px-4 py-3 flex gap-3 items-center">
+            <span className="text-bad shrink-0">
               <Icon name="alert" size={20} />
             </span>
             <div className="text-[15px]">
-              <b className="text-bad">Üle piiri: {joinEt(over.map((r) => r.subject.name))}.</b> {setup.rule.consequence} Räägi aineõpetajaga, kuidas puudujääki tasa teha.
+              <b className="text-bad">Üle piiri: {joinEt(over.map((r) => r.subject.name))}</b>
             </div>
           </div>
         )}

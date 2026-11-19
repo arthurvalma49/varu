@@ -281,22 +281,6 @@ function RulePage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }) {
           </button>
         ))}
       </Section>
-
-      <Section title="Tagajärg" info="Mis juhtub, kui jõuad piirini. Näidatakse esilehel, kui aine on üle piiri.">
-        <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>Märk tuleb kohe (nt MH)</span>
-          <Switch label="Tagajärg on automaatne" checked={setup.rule.automatic} onChange={(v) => updateSetup((d) => void (d.rule.automatic = v))} />
-        </div>
-        <label className="cell flex px-5 py-3">
-          <textarea
-            rows={2}
-            className="w-full bg-transparent border-0 outline-none resize-none leading-snug"
-            aria-label="Mis juhtub piiri ületamisel"
-            value={setup.rule.consequence}
-            onChange={(e) => updateSetup((d) => void (d.rule.consequence = e.target.value))}
-          />
-        </label>
-      </Section>
     </>
   );
 }
