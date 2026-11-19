@@ -419,8 +419,9 @@ export function Overview({
 
       <ActionSheet open={!!sheet} onClose={() => setSheet(null)} title={sheet?.title} message={sheet?.message} actions={sheet?.actions ?? []} />
 
-      <div className="px-5 -mt-3 flex flex-col gap-3 text-[13px] text-muted num">
-        <span>
+      {/* The pill sits on the cards' edge, so its label (20px padding) lines up with the text above. */}
+      <div className="-mt-3 flex flex-col gap-3 text-[13px] text-muted num">
+        <span className="px-5">
           {setup.windowName}: {schoolDaysLeft} koolipäeva veel.
         </span>
         <Button variant="ghost" onClick={onLog} className="self-start">
