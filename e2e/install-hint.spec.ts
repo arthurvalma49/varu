@@ -23,3 +23,36 @@ test("desktop browsers without an install prompt see no hint", async ({ page }) 
   await expect(page.getByRole("heading", { name: /Kui palju tunde/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Lisa avakuvale" })).toHaveCount(0);
 });
+
+const cases: { name: string; ua: string; expect: RegExp }[] = [
+  {
+    name: "Instagram's built-in browser on iPhone says to open the link in Safari first",
+    ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0.0.0",
+    expect: /Instagrami sees.*„Ava Safaris”/,
+  },
+  {
+    name: "Snapchat on Android says to open the link in the browser",
+    ua: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36 Snapchat/13.0",
+    expect: /Snapchati sees.*„Ava brauseris”/,
+  },
+  {
+    name: "Chrome on iPhone points to its Share button or menu",
+    ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1",
+    expect: /menüüs.*„Lisa avakuvale”.*Safaris/,
+  },
+  {
+    name: "Firefox on Android points to its menu",
+    ua: "Mozilla/5.0 (Android 14; Mobile; rv:132.0) Gecko/132.0 Firefox/132.0",
+    expect: /menüü.*„Paigalda”/,
+  },
+];
+
+for (const c of cases) {
+  test.describe(c.name, () => {
+    test.use({ userAgent: c.ua });
+    test("shows the right steps", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.getByRole("region", { name: "Lisa avakuvale" })).toContainText(c.expect);
+    });
+  });
+}
