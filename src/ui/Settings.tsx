@@ -13,6 +13,7 @@ import { ActionSheet, Button, Check, DateField, Icon, LargeTitle, NavBar, Row, S
 import { eduSegments } from "../core/edupage";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
+import { ACCENTS, getAccent, setAccent } from "./accent";
 
 type Page = "root" | "rule" | "window" | "subjects" | "timetable" | "edupage" | "holidays" | "share" | "backup";
 const TITLES: Record<Exclude<Page, "root">, string> = {
@@ -88,6 +89,7 @@ export function Settings({ store }: { store: Store }) {
             <IconLabel icon="flask">Testrežiim</IconLabel>
             <Switch label="Testrežiim" checked={!!data.demo} onChange={(on) => (on ? enterDemo(data, replaceAll) : leaveDemo(data, replaceAll))} />
           </div>
+          <AccentRow />
         </Section>
         {!data.demo && <ResetAll onReset={() => replaceAll({ setup: null, absences: [] })} />}
       </div>
@@ -682,5 +684,36 @@ function IconLabel({ icon, children }: { icon: Parameters<typeof SettingsIcon>[0
       <SettingsIcon name={icon} color="var(--accent)" />
       {children}
     </span>
+  );
+}
+
+/** Accent colour picker, to try alternatives to blue on the phone. */
+function AccentRow() {
+  const [cur, setCur] = useState(getAccent);
+  return (
+    <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
+      <IconLabel icon="palette">Värv</IconLabel>
+      <div role="radiogroup" aria-label="Värv" className="flex items-center gap-1">
+        {ACCENTS.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            role="radio"
+            aria-checked={cur === a.id}
+            aria-label={a.name}
+            className="press size-9 grid place-items-center rounded-full cursor-pointer"
+            onClick={() => {
+              setAccent(a.id);
+              setCur(a.id);
+            }}
+          >
+            <span
+              className="size-[26px] rounded-full transition-[box-shadow] duration-200"
+              style={{ background: a.swatch, boxShadow: cur === a.id ? `0 0 0 2px var(--surface), 0 0 0 4px ${a.swatch}` : "none" }}
+            />
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

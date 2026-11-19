@@ -345,7 +345,7 @@ export default function App() {
           {toast.undo && (
             <button
               type="button"
-              className="tap min-h-10 px-4 rounded-full font-semibold text-[15px] text-[#0a84ff] cursor-pointer"
+              className="tap min-h-10 px-4 rounded-full font-semibold text-[15px] text-accent cursor-pointer"
               onClick={() => {
                 toast.undo!();
                 setToast(null);

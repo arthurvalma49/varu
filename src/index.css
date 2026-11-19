@@ -93,6 +93,76 @@
   color-scheme: dark;
 }
 
+/* Accent alternatives (picked in Seaded > Testimine). Light values are darkened so text on white stays readable. */
+:root[data-accent="cyan"] {
+  --accent: #0088a6;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(0 136 166 / 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="cyan"]:not([data-theme="light"]) {
+  --accent: #3cd3fe;
+  --accent-ink: #00222b;
+  --accent-soft: rgb(60 211 254 / 0.2);
+  }
+}
+:root[data-theme="dark"][data-accent="cyan"] {
+  --accent: #3cd3fe;
+  --accent-ink: #00222b;
+  --accent-soft: rgb(60 211 254 / 0.2);
+}
+:root[data-accent="mint"] {
+  --accent: #00857f;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(0 133 127 / 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="mint"]:not([data-theme="light"]) {
+  --accent: #63e6e2;
+  --accent-ink: #00211f;
+  --accent-soft: rgb(99 230 226 / 0.2);
+  }
+}
+:root[data-theme="dark"][data-accent="mint"] {
+  --accent: #63e6e2;
+  --accent-ink: #00211f;
+  --accent-soft: rgb(99 230 226 / 0.2);
+}
+:root[data-accent="indigo"] {
+  --accent: #5856d6;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(88 86 214 / 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="indigo"]:not([data-theme="light"]) {
+  --accent: #7d7aff;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(125 122 255 / 0.2);
+  }
+}
+:root[data-theme="dark"][data-accent="indigo"] {
+  --accent: #7d7aff;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(125 122 255 / 0.2);
+}
+:root[data-accent="purple"] {
+  --accent: #8944ab;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(137 68 171 / 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="purple"]:not([data-theme="light"]) {
+  --accent: #bf5af2;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(191 90 242 / 0.2);
+  }
+}
+:root[data-theme="dark"][data-accent="purple"] {
+  --accent: #bf5af2;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(191 90 242 / 0.2);
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
