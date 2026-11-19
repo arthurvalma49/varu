@@ -174,4 +174,7 @@ export function startingAbsence(setup: Setup, counts: Record<string, number>, cr
   return { id: `start-${setup.windowStart}`, date: setup.windowStart, lessons, note: "Algseis: puudumised enne Varu kasutamist", createdAt };
 }
 
+/** The one starting-point entry: absences from before the app was used, without dates. */
+export const isStartingAbsence = (a: Absence) => a.id.startsWith("start-");
+
 export const WEEKDAYS: Weekday[] = [1, 2, 3, 4, 5];

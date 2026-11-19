@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { inWindow } from "../core/calc";
 import { parsePaste, toAbsences, type ParsedLine } from "../core/importer";
+import { isStartingAbsence, startingAbsence } from "../core/setup";
 import type { Absence, Setup } from "../core/types";
 import { Button, Card, Empty, Icon, MON_LONG, Row, Section, Sheet, Stepper, SwipeRow, cap, fmtDate, tunde } from "./kit";
 
@@ -23,11 +24,13 @@ export function History({
   onAdd: () => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
+  const [startOpen, setStartOpen] = useState(false);
+  const start = absences.find(isStartingAbsence);
   const [editing, setEditing] = useState<{ id: string; lessons: Record<string, number> } | null>(null);
   const name = (id: string) => setup.subjects.find((s) => s.id === id)?.name ?? id;
-  const list = [...absences].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  const list = [...absences].filter((a) => !isStartingAbsence(a)).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   const sum = (e: Absence) => Object.values(e.lessons).reduce((x, n) => x + n, 0);
-  const done = list.filter((e) => inWindow(setup, e.date) && e.date <= now).reduce((s, e) => s + sum(e), 0);
+  const done = [...list, ...(start ? [start] : [])].filter((e) => inWindow(setup, e.date) && e.date <= now).reduce((s, e) => s + sum(e), 0);
   const planned = list.filter((e) => inWindow(setup, e.date) && e.date > now).reduce((s, e) => s + sum(e), 0);
 
   // Group by month, newest first.
@@ -54,9 +57,12 @@ export function History({
         </Card>
       </div>
 
-      <Section>
+      <Section info="Alustasid äppi kasutamist perioodi keskel? Lisa „Juba puudutud tunnid”: mitu tundi igas aines oled varem puudunud. Stuudiumis näed neid oma ülevaate kalendrist (punased ja hallid päevad, päeval puudutades näed tunde).">
+        <Row onClick={() => setStartOpen(true)} chevron detail={start ? <span className="num">{tunde(sum(start))}</span> : undefined}>
+          <span className="text-accent">Juba puudutud tunnid</span>
+        </Row>
         <Row onClick={() => setImportOpen((v) => !v)} chevron={!importOpen}>
-          <span className="text-accent">{importOpen ? "Sulge import" : "Kleebi Stuudiumist või eKoolist"}</span>
+          <span className="text-accent">{importOpen ? "Sulge" : "Kleebi nimekiri"}</span>
         </Row>
         {importOpen && (
           <PasteImport
@@ -76,12 +82,19 @@ export function History({
             title="Puhas leht"
             icon="tray"
             action={
-              <Button variant="ghost" onClick={onAdd}>
-                Lisa puudumine
-              </Button>
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="ghost" onClick={onAdd}>
+                  Lisa puudumine
+                </Button>
+                {!start && (
+                  <Button variant="quiet" onClick={() => setStartOpen(true)}>
+                    Juba puudutud tunnid
+                  </Button>
+                )}
+              </div>
             }
           >
-            Siia tulevad sinu puudumised. Märgi need vaates „Täna”, + nupuga või kleebi nimekiri oma e-koolist.
+            Siia tulevad sinu puudumised. Märgi need vaates „Täna” või + nupuga.{start ? "" : " Kui oled sel perioodil juba puudunud, lisa need korraga."}
           </Empty>
         </Card>
       ) : (
@@ -130,6 +143,21 @@ export function History({
           );
         })
       )}
+      <StartCountsSheet
+        open={startOpen}
+        onClose={() => setStartOpen(false)}
+        setup={setup}
+        start={start}
+        onSave={(lessons) => {
+          const any = Object.values(lessons).some((n) => n > 0);
+          if (start) (any ? onUpdate(start.id, Object.fromEntries(Object.entries(lessons).filter(([, n]) => n > 0))) : onRemove(start.id));
+          else if (any) {
+            const a = startingAbsence(setup, lessons, new Date().toISOString());
+            if (a) onImport([a]);
+          }
+          setStartOpen(false);
+        }}
+      />
       <Sheet
         open={!!editing}
         onClose={() => setEditing(null)}
@@ -223,5 +251,55 @@ function PasteImport({ setup, existingDates, onImport }: { setup: Setup; existin
         Impordi {n || ""} {n === 1 ? "tund" : "tundi"}
       </Button>
     </div>
+  );
+}
+
+/** Absences from before the app was used: one undated count per subject. */
+function StartCountsSheet({
+  open,
+  onClose,
+  setup,
+  start,
+  onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  setup: Setup;
+  start: Absence | undefined;
+  onSave: (lessons: Record<string, number>) => void;
+}) {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [seen, setSeen] = useState(false);
+  // Load the saved numbers each time the sheet opens.
+  if (open && !seen) {
+    setSeen(true);
+    setCounts({ ...(start?.lessons ?? {}) });
+  }
+  if (!open && seen) setSeen(false);
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const subjects = [...setup.subjects].sort((a, b) => Number(!!a.advisory) - Number(!!b.advisory));
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Juba puudutud"
+      trailing={
+        <button type="button" className="tap text-accent font-semibold text-[17px] min-h-11 pl-3 cursor-pointer" onClick={() => onSave(counts)}>
+          Valmis
+        </button>
+      }
+    >
+      <p className="m-0 px-1 text-[15px] text-muted">
+        Mitu tundi igas aines oled sel perioodil juba puudunud, enne kui hakkasid äppi kasutama. Stuudiumis näed neid oma ülevaate kalendrist: punased ja hallid päevad, päeval puudutades näed tunde.
+      </p>
+      <Section title={total ? `Kokku ${tunde(total)}` : "Ained"}>
+        {subjects.map((sub) => (
+          <div key={sub.id} className="cell flex items-center justify-between gap-3 px-5 min-h-[56px]">
+            <span className="min-w-0 truncate">{sub.name}</span>
+            <Stepper label={sub.name} max={99} value={counts[sub.id] ?? 0} onChange={(n) => setCounts({ ...counts, [sub.id]: n })} />
+          </div>
+        ))}
+      </Section>
+    </Sheet>
   );
 }

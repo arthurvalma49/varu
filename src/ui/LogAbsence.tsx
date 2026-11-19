@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
+import { isStartingAbsence } from "../core/setup";
 import { inWindow, lessonTimes, lessonsOn, missableOn, preview, segmentFor, statusOf, summary, withCancelled } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow } from "../core/types";
@@ -64,6 +65,7 @@ export function LogAbsence({
   const loggedByDay = useMemo(() => {
     const m = new Map<string, Record<string, number>>();
     for (const a of absences) {
+      if (isStartingAbsence(a)) continue;
       const d = m.get(a.date) ?? {};
       for (const [id, n] of Object.entries(a.lessons)) d[id] = (d[id] ?? 0) + n;
       m.set(a.date, d);

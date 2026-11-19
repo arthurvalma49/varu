@@ -332,3 +332,17 @@ describe("tester mode demo data", () => {
     expect(d.demo).toBe(true);
   });
 });
+
+describe("starting absence", () => {
+  it("is one undated entry at the period start, recognised by its id", async () => {
+    const { startingAbsence, isStartingAbsence } = await import("./setup");
+    const { ram9bTemplate } = await import("./templates");
+    const s = ram9bTemplate();
+    const a = startingAbsence(s, { matemaatika: 3, fuusika: 0 }, "x")!;
+    expect(a.date).toBe(s.windowStart);
+    expect(a.lessons).toEqual({ matemaatika: 3 });
+    expect(isStartingAbsence(a)).toBe(true);
+    expect(isStartingAbsence({ ...a, id: "abc" })).toBe(false);
+    expect(startingAbsence(s, { matemaatika: 0 }, "x")).toBeNull();
+  });
+});

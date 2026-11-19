@@ -295,7 +295,7 @@ export function Onboarding({
           )}
           <Lead
             title="Oled juba puudunud?"
-            text={today >= draft.window.start ? "Mitu tundi igas aines oled sel perioodil juba puudunud. Kui ei tea, jäta 0 ja lisa hiljem." : "Periood pole veel alanud, jäta kõik 0."}
+            text={today >= draft.window.start ? "Mitu tundi igas aines oled sel perioodil juba puudunud. Stuudiumis näed neid oma ülevaate kalendrist. Kui ei tea, jäta 0 ja lisa hiljem Ajaloos." : "Periood pole veel alanud, jäta kõik 0."}
           />
           <Section>
             {usedSubjects.map((s) => (
@@ -436,7 +436,7 @@ function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
 const TOUR: { key: "overview" | "history" | "settings" | "plus"; name: string; text: string }[] = [
   { key: "overview", name: "Täna", text: "Tänased tunnid ja kas võid neist puududa. Üks puudutus märgib puudumise. Kui tund jääb ära, märgi ka see: siis on aine tunde vähem." },
   { key: "plus", name: "Pluss", text: "Puudumine mõnele teisele päevale, plaan mitmeks päevaks või ärajäänud tund. Nupp on üleval paremal." },
-  { key: "history", name: "Ajalugu", text: "Kõik sissekanded. Lükka vasakule, et muuta või kustutada, või kleebi nimekiri Stuudiumist." },
+  { key: "history", name: "Ajalugu", text: "Kõik sissekanded. Lükka vasakule, et muuta või kustutada. Siia lisad ka tunnid, mis puudusid enne äppi." },
   { key: "settings", name: "Seaded", text: "Tunniplaan, kool ja reegel. Siit jagad tunniplaani ka klassikaaslastega." },
 ];
 const TAB_ORDER = ["overview", "history", "settings"] as const;

@@ -1,3 +1,4 @@
+import { isStartingAbsence } from "./core/setup";
 import { useEffect, useMemo, useState } from "react";
 import { missableOn, summary, withCancelled } from "./core/calc";
 import { today } from "./core/dates";
@@ -98,7 +99,7 @@ export default function App() {
   };
   /** One lesson from the Täna list: merged into that day's entry so history stays one row per day. */
   const logLesson = (date: string, subjectId: string, count: number) => {
-    const existing = data.absences.find((a) => a.date === date);
+    const existing = data.absences.find((a) => a.date === date && !isStartingAbsence(a));
     const text = date > now ? `${name(subjectId)} plaanis, ${tunde(count)}` : date === now ? `${name(subjectId)} kirjas. Naudi vaba tundi.` : `${name(subjectId)} kirjas, ${tunde(count)}`;
     if (existing) {
       const prev = { ...existing.lessons };
@@ -131,7 +132,7 @@ export default function App() {
   };
   /** Takes logged lessons of one subject off a day again (from whichever entries hold them). */
   const unlogLesson = (date: string, subjectId: string, count: number) => {
-    const entries = data.absences.filter((a) => a.date === date && a.lessons[subjectId]);
+    const entries = data.absences.filter((a) => a.date === date && a.lessons[subjectId] && !isStartingAbsence(a));
     if (!entries.length) return;
     let left = count;
     const restore: (() => void)[] = [];

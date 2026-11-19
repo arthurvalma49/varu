@@ -1,5 +1,6 @@
 import { fractionToPct, lessonTimes, nextLesson, planningSegment, timetableOn } from "../core/calc";
 import { addDays } from "../core/dates";
+import { isStartingAbsence } from "../core/setup";
 import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
 import { Card, Empty, Meter, NavBar, Row, Section, WD_LONG, cap, fmtDate, fmtLimit, leftLabel, limitPhrase, pct, tunde } from "./kit";
 
@@ -84,7 +85,7 @@ export function SubjectDetail({
         {history.length ? (
           history.map((a) => (
             <Row key={a.id} detail={<span className="num">{tunde(a.lessons[subjectId])}</span>}>
-              <span className="num">{fmtDate(a.date, true)}</span>
+              <span className="num">{isStartingAbsence(a) ? "Enne äppi" : fmtDate(a.date, true)}</span>
               {a.date > now && <span className="ml-2 text-[12px] font-semibold text-accent bg-accent-soft rounded-full px-2 py-0.5">Plaan</span>}
               {a.note && <div className="text-[13px] text-muted truncate">{a.note}</div>}
             </Row>

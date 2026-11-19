@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { isStartingAbsence } from "../core/setup";
 import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
 import { addDays, eachDay, weekdayOf } from "../core/dates";
 import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
@@ -64,7 +65,7 @@ export function Overview({
   const live = focus === now ? clock : null;
   const dayWord = !focus ? "" : focus === now ? "Täna" : focus === addDays(now, 1) ? "Homme" : cap(WD_ON[weekdayOf(focus)]);
   const focusBlocks = focus ? lessonsOn(setup, focus) : [];
-  const focusEntry = focus ? absences.find((a) => a.date === focus) : undefined;
+  const focusEntry = focus ? absences.find((a) => a.date === focus && !isStartingAbsence(a)) : undefined;
   // Verdict on what is still open that day: lessons already logged are spent.
   // Still-open lessons, counting what remains of a partly logged double lesson.
   const loggedLeft = { ...(focusEntry?.lessons ?? {}) };
