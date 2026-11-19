@@ -7,6 +7,7 @@ import { eduSegments } from "../core/edupage";
 import { decodeSetup } from "../core/share";
 import { emptyTimetable, ram9bTemplate } from "../core/templates";
 import type { Absence, Setup } from "../core/types";
+import { InstallHint } from "./InstallHint";
 import { Button, Check, DateField, Icon, NavBar, Row, Section, Stepper, Switch, TAB_ICONS, fmtLimit, limitPhrase, tunde, type IconName } from "./kit";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
@@ -101,6 +102,7 @@ export function Onboarding({
           { icon: "calendar", title: "Plaani ette", text: "Reis või võistlus? Kontrolli enne, kas see viiks üle piiri." },
           { icon: "lock", title: "Ainult sinu telefonis", text: "Puudumised ei lahku su seadmest. Klassiga jagad ainult tunniplaani." },
         ]}
+        extra={<InstallHint early />}
         primary={{ label: "Jätka", onClick: () => setStep("rule") }}
         secondary={{ label: "Jäta vahele", onClick: () => setStep("start") }}
       />
@@ -329,7 +331,9 @@ function Welcome({
   features,
   primary,
   secondary,
+  extra,
 }: {
+  extra?: ReactNode;
   title: string;
   body?: string;
   features?: { icon: IconName; title: string; text: string }[];
@@ -366,6 +370,11 @@ function Welcome({
           </ul>
         )}
       </div>
+      {extra && (
+        <div className="mt-8 rise" style={{ animationDelay: "700ms" }}>
+          {extra}
+        </div>
+      )}
       <div className="rise flex flex-col gap-1 mt-10" style={{ animationDelay: "760ms" }}>
         <Button size="lg" className="w-full" onClick={primary.onClick}>
           {primary.label}

@@ -1,4 +1,5 @@
 import { isStartingAbsence } from "./core/setup";
+import { InstallHint } from "./ui/InstallHint";
 import { useEffect, useMemo, useState } from "react";
 import { missableOn, summary, withCancelled } from "./core/calc";
 import { today } from "./core/dates";
@@ -290,6 +291,7 @@ export default function App() {
             }}
           />
         )}
+        {tab === "overview" && !detail && <InstallHint />}
         {tab === "overview" && !detail && fresh && <ShareCard setup={data.setup} onClose={() => setFresh(false)} />}
         {tab === "overview" && !detail && (
           <Overview

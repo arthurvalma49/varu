@@ -68,3 +68,10 @@ Known gaps:
 - Haptics (tested on a real iPhone): iOS only plays a haptic when the user's own tap flips a native `<input type=checkbox switch>`; flipping it from code does nothing. So `HapticButton` (kit.tsx) is a label with a hidden switch inside, `Button haptic` uses it, and `Switch` is a real native switch. Used on Puudun, Salvesta/Planeeri, swipe and action-sheet actions, calendar days. `haptics.ts` is Android vibrate only.
 - Sheets and action sheets start below the status bar: any layer appearing over the top edge made Safari re-tint the status bar (brief flash, seen on device in every variant).
 
+## Tests
+- `npm test`: unit tests for `src/core` (vitest, `src/**/*.test.ts` only).
+- `npm run test:e2e`: Playwright browser tests in `e2e/` against the production build at phone size, with a fixed clock (Tallinn time) on the RAM 9.b example. Covers onboarding, EduPage import (static snapshot), Puudun once + undo, half of a double lesson, Tund jääb ära + Taasta, day rollover and self-study days, Lisa skipping logged lessons, range by tap and by drag, Juba puudutud tunnid, install hint. Uses the installed Chrome (`channel: "chrome"`), no browser download.
+
+## Install hint
+- `src/ui/InstallHint.tsx`: on iPhone in a browser tab (not the home-screen app) explains Jaga, then "Lisa avakuvale"; on Android uses the browser's install prompt. Shown on the first onboarding screen (says to install before setting up, since browser data does not carry over) and on Täna. "Hiljem" hides it for 7 days.
+

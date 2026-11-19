@@ -3,3 +3,5 @@ dist
 _to_delete
 .vercel
 .env*
+test-results
+playwright-report
