@@ -18,8 +18,9 @@ export const SCHOOLS: SchoolPreset[] = [
     rule: {
       limit: { num: 1, den: 4 },
       mode: "gte",
+      // The MH mark comes at the limit, but it is provisional: the õppenõukogu decides (usually lifts it).
       automatic: true,
-      consequence: "Kokkuvõttev hinne on MH (mitte hinnatud).",
+      consequence: "Hinne jääb MH-ks (mitte hinnatud), kuni õppenõukogu otsustab. Kui puudumised olid põhjendatud, võetakse MH tavaliselt maha, muidu võib tulla lisatöö või muu meede.",
     },
     scope: "Hindamisjuhend 2026/27 p 3.1, poolaasta hinded",
     verified: false,

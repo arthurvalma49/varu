@@ -43,7 +43,7 @@ src/store.ts   localStorage persistence
 
 | School | Limit | Fails when | Consequence | Source |
 | --- | --- | --- | --- | --- |
-| Rocca al Mare Kool | 25% | 25% or more | Automatic MH (hindamisjuhend 2026/27 p 3.1) | not public, verify |
+| Rocca al Mare Kool | 25% | 25% or more | MH at the limit, provisional until the õppenõukogu decides; usually lifted for justified absences (hindamisjuhend 2026/27 p 3.1) | not public, verify |
 | Oru Kool | 18% | 18% or more | Teacher may use a summative test (trimester) | [link](https://oru.edu.ee/wp-content/uploads/2025/01/HINDAMISJUHEND-2025.pdf) |
 | Miina Härma Gümnaasium | 1/3 (or 10+ lessons) | 1/3 or more | Teacher may assign a whole-course test (gr 10–12) | [link](https://miinaharma.ee/failid/hindamisjuhend_01_09_2026.pdf) |
 | Võru Gümnaasium | 1/3 | more than 1/3 | Teacher may change how the course is assessed | [link](https://voru.edu.ee/wp-content/uploads/2024/11/Lisa_5_Voru-Gumnaasiumi-opilase-hindamise-tingimused-ja-kord.pdf) |
@@ -53,7 +53,7 @@ src/store.ts   localStorage persistence
 
 Checked with no percentage rule: Tallinna Prantsuse Lütseum, Hugo Treffneri Gümnaasium.
 
-Takeaway: percentage rules are common, but limits vary from 18% to 50%, and RAM's automatic MH is the strictest found. Most schools let the teacher decide. Rules change yearly, so presets link their source.
+Takeaway: percentage rules are common, but limits vary from 18% to 50%, and RAM's MH at the limit (provisional, the õppenõukogu decides) is among the stricter ones. Most schools let the teacher decide. Rules change yearly, so presets link their source.
 
 ## Roadmap
 

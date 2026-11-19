@@ -6,7 +6,7 @@ Moved from a Claude chat session (18 Nov 2026) to Claude Code. Read this, then R
 
 Arthur and a friend (both at Rocca al Mare Kool, RAM) are building an app that shows each student how many lessons they can still miss per subject before hitting the school's absence limit.
 
-- Phase 1 (now): RAM students. RAM rule: 25% or more of a subject's lessons missed in the grading window = automatic MH (mitte hinnatud). Source: RAM hindamisjuhend 2026/27 p 3.1 (not publicly online, not yet verified against the real document).
+- Phase 1 (now): RAM students. RAM rule: 25% or more of a subject's lessons missed in the grading window = MH (mitte hinnatud) until the õppenõukogu decides; usually lifted for justified absences, otherwise extra work or another measure (confirmed by a RAM student, Nov 2026). Source: RAM hindamisjuhend 2026/27 p 3.1 (not publicly online, not yet verified against the real document).
 - Phase 2: any Estonian student (school presets + custom rules).
 - Platform: installable PWA now, native mobile app later.
 - Data entry: manual logging plus paste import from Stuudium/eKool. No auto-sync (decided: fragile and unofficial).

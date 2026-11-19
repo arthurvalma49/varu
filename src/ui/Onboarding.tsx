@@ -400,7 +400,7 @@ function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void 
       <div className="px-2 flex-1">
         <h1 className="m-0 text-[34px] leading-[40px] font-bold">Kuidas see arvutab</h1>
         <p className="mt-3 mb-0 text-[17px] text-muted">
-          RAMis on piir {fmtLimit(ram.limit)}: kui puudud aines {fmtLimit(ram.limit)} või rohkem tundidest, on hinne automaatselt MH.
+          RAMis on piir {fmtLimit(ram.limit)}: kui puudud aines {fmtLimit(ram.limit)} või rohkem tundidest, jääb hinne MH-ks, kuni õppenõukogu otsustab. Põhjendatud puudumiste korral võetakse see tavaliselt maha.
         </p>
 
         <div className="mt-7 bg-surface rounded-[26px] p-5">

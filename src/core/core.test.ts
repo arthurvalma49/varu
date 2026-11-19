@@ -346,3 +346,13 @@ describe("starting absence", () => {
     expect(startingAbsence(s, { matemaatika: 0 }, "x")).toBeNull();
   });
 });
+
+describe("RAM rule wording", () => {
+  it("explains that MH waits for the õppenõukogu, also for setups saved earlier", async () => {
+    const { migrateSetup, ram9bTemplate, RAM_OLD_CONSEQUENCE } = await import("./templates");
+    const fresh = ram9bTemplate();
+    expect(fresh.rule.consequence).toMatch(/õppenõukogu/);
+    const old = { ...fresh, rule: { ...fresh.rule, consequence: RAM_OLD_CONSEQUENCE } };
+    expect(migrateSetup(old).rule.consequence).toMatch(/õppenõukogu/);
+  });
+});

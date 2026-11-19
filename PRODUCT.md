@@ -16,7 +16,7 @@ Other Estonian schools are a later phase (presets already exist in `src/core/sch
 
 ## Product Purpose
 
-Tell a student how many more lessons they can miss in each subject before hitting the school's absence limit, so they never lose a grade to it by accident. RAM rule: missing 25% or more of a subject's lessons in the grading window means an automatic MH (mitte hinnatud). Success: a student can answer "can I skip this?" in a few seconds, and nobody who uses Varu gets an MH they did not see coming.
+Tell a student how many more lessons they can miss in each subject before hitting the school's absence limit, so they never lose a grade to it by accident. RAM rule: missing 25% or more of a subject's lessons in the grading window puts an MH (mitte hinnatud) on the grade until the õppenõukogu decides; it is usually lifted when the absences were justified, otherwise extra work or another measure may follow. Success: a student can answer "can I skip this?" in a few seconds, and nobody who uses Varu gets an MH they did not see coming.
 
 ## Positioning
 

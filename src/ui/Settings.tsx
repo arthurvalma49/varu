@@ -282,7 +282,7 @@ function RulePage({ setup, updateSetup }: { setup: Setup; updateSetup: Upd }) {
 
       <Section title="Tagajärg" info="Mis juhtub, kui jõuad piirini. Näidatakse esilehel, kui aine on üle piiri.">
         <div className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>Automaatne (mitte õpetaja otsus)</span>
+          <span>Märk tuleb kohe (nt MH)</span>
           <Switch label="Tagajärg on automaatne" checked={setup.rule.automatic} onChange={(v) => updateSetup((d) => void (d.rule.automatic = v))} />
         </div>
         <label className="cell flex px-5 py-3">

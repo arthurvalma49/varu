@@ -112,7 +112,11 @@ export function ram9bTemplate(): Setup {
 export const emptyTimetable = (): Timetable => ({ 1: [], 2: [], 3: [], 4: [], 5: [] });
 
 /** Upgrade setups saved by older versions: RAM setups gain the `advisory` flag and bell times. */
+/** RAM's MH is provisional (õppenõukogu decides); earlier versions called it final. */
+export const RAM_OLD_CONSEQUENCE = "Kokkuvõttev hinne on MH (mitte hinnatud).";
+
 export function migrateSetup(s: Setup): Setup {
+  if (s.schoolId === "ram" && s.rule.consequence === RAM_OLD_CONSEQUENCE) s.rule.consequence = "Hinne jääb MH-ks (mitte hinnatud), kuni õppenõukogu otsustab. Kui puudumised olid põhjendatud, võetakse MH tavaliselt maha, muidu võib tulla lisatöö või muu meede.";
   if (s.schoolId === "ram" && !s.periodTimes) s.periodTimes = clone(RAM_PERIOD_TIMES);
   if (s.schoolId === "ram")
     for (const sub of s.subjects)
