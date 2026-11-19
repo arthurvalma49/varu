@@ -163,6 +163,11 @@ textarea {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Text fields sit inside list cells; the caret marks focus, as in iOS. No box around them. */
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
 input,
 select,
 textarea,

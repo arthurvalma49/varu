@@ -159,7 +159,7 @@ export function EduImport({
       >
         <form
           noValidate
-          className="cell flex items-center gap-3 pl-5 pr-3 min-h-[52px]"
+          className="cell flex items-center gap-3 pl-5 pr-2.5 min-h-[52px]"
           onSubmit={(e) => {
             e.preventDefault();
             load();
@@ -182,7 +182,7 @@ export function EduImport({
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-          <Button type="submit" variant="ghost" className="shrink-0 min-h-8 px-3" disabled={!school || phase.k === "loading"}>
+          <Button type="submit" variant="ghost" size="sm" className="shrink-0" disabled={!school || phase.k === "loading"}>
             {phase.k === "loading" ? "Otsin…" : "Otsi"}
           </Button>
         </form>

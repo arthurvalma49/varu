@@ -131,7 +131,7 @@ export function InstallHint({ early }: { early?: boolean }) {
         <div className="flex gap-2 mt-3">
           {prompt && (
             <Button
-              className="min-h-9 px-4"
+              size="sm"
               onClick={async () => {
                 const e = deferred;
                 if (!e) return;
@@ -145,7 +145,7 @@ export function InstallHint({ early }: { early?: boolean }) {
               Paigalda
             </Button>
           )}
-          <Button variant="quiet" className="min-h-9 !px-0" onClick={later}>
+          <Button variant="quiet" size="sm" className="!px-0" onClick={later}>
             Hiljem
           </Button>
         </div>

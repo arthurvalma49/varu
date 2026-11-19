@@ -283,14 +283,16 @@ export function Button({
   className = "",
   haptic: withHaptic,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" | "quiet"; size?: "md" | "lg"; haptic?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" | "quiet"; size?: "sm" | "md" | "lg"; haptic?: boolean }) {
   const v = {
     primary: "bg-accent text-accent-ink",
     ghost: "bg-accent-soft text-accent",
     danger: "bg-bad-fill text-bad-ink",
     quiet: "bg-transparent text-accent",
   }[variant];
-  const s = size === "lg" ? "min-h-[52px] px-6 rounded-full text-[17px]" : "min-h-11 px-5 rounded-full text-[15px]";
+  // sm sits inside a 52px list row: 32px tall, so with a 10px right inset it is evenly spaced on all sides.
+  const s =
+    size === "lg" ? "min-h-[52px] px-6 rounded-full text-[17px]" : size === "sm" ? "min-h-8 px-3.5 rounded-full text-[15px]" : "min-h-11 px-5 rounded-full text-[15px]";
   const cls = `${s} tap font-semibold cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${v} ${className}`;
   if (withHaptic)
     return (

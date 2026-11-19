@@ -655,7 +655,7 @@ function AddName({ onAdd }: { onAdd: (n: string) => void }) {
   const [v, setV] = useState("");
   return (
     <form
-      className="cell flex items-center gap-3 px-5 min-h-[52px]"
+      className="cell flex items-center gap-3 pl-5 pr-2.5 min-h-[52px]"
       onSubmit={(e) => {
         e.preventDefault();
         const n = v.trim();
@@ -664,7 +664,7 @@ function AddName({ onAdd }: { onAdd: (n: string) => void }) {
       }}
     >
       <input className="cell-input flex-1 placeholder:text-faint" enterKeyHint="done" autoCapitalize="sentences" placeholder="Muu aine" aria-label="Muu aine nimi" value={v} onChange={(e) => setV(e.target.value)} />
-      <Button type="submit" variant="ghost" className="min-h-8 px-3" disabled={!v.trim()}>
+      <Button type="submit" variant="ghost" size="sm" className="shrink-0" disabled={!v.trim()}>
         Lisa
       </Button>
     </form>
