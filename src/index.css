@@ -226,7 +226,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   content: "";
   position: absolute;
   top: 0;
-  right: 0;
+  right: var(--sep-inset-end, 20px);
   left: var(--sep-inset, 16px);
   height: 0.5px;
   background: var(--line);
