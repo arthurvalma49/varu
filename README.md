@@ -35,7 +35,7 @@ src/core/      pure TypeScript, no DOM: reuse as-is in a React Native / Expo app
   schools.ts     researched school presets
   templates.ts   RAM 9.b template
   share.ts       share codes, validation
-src/ui/        React screens (Ülevaade, Lisa, Ajalugu, Seaded, onboarding)
+src/ui/        React screens (Täna, Lisa sheet, Seaded with Ajalugu, onboarding)
 src/store.ts   localStorage persistence
 ```
 

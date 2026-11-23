@@ -20,8 +20,8 @@ test("a double lesson can be skipped by halves", async ({ page }) => {
 
 test("Tund jääb ära marks a lesson cancelled and Taasta restores it", async ({ page }) => {
   await openDemo(page);
-  await page.getByRole("button", { name: "Tund jääb ära…" }).click();
-  await page.getByRole("button", { name: "Matemaatika, 10:40" }).click();
+  await page.getByRole("button", { name: "Muud valikud: Matemaatika" }).click();
+  await page.getByRole("button", { name: "Tund jääb ära", exact: true }).click();
   expect((await cancelled(page))["2026-11-19"]).toEqual({ matemaatika: 2 });
   await page.getByRole("button", { name: "Taasta" }).click();
   expect((await cancelled(page))["2026-11-19"] ?? {}).toEqual({});

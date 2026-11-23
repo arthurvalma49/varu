@@ -7,7 +7,6 @@ export const THURSDAY_9AM = "2026-11-19T09:00:00+02:00";
 export async function openDemo(page: Page, at = THURSDAY_9AM) {
   await page.clock.setFixedTime(new Date(at));
   await page.goto("/");
-  await page.getByRole("button", { name: "Jäta vahele" }).click();
   await page.getByRole("button", { name: "RAM 9.b näidis" }).click();
 }
 

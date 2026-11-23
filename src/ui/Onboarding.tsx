@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { maxAllowed } from "../core/calc";
 import { isValidISO } from "../core/dates";
 import { SCHOOLS } from "../core/schools";
 import { COMMON_SUBJECTS, buildSetup, defaultWindow, startingAbsence, subjectId, type SetupDraft } from "../core/setup";
@@ -8,17 +7,19 @@ import { decodeSetup } from "../core/share";
 import { emptyTimetable, ram9bTemplate } from "../core/templates";
 import type { Absence, Setup } from "../core/types";
 import { InstallHint } from "./InstallHint";
-import { Button, Check, DateField, Icon, NavBar, Row, Section, Stepper, Switch, TAB_ICONS, fmtLimit, limitPhrase, tunde, type IconName } from "./kit";
+import { Button, Check, DateField, Icon, NavBar, Row, Section, Stepper, Switch, fmtLimit, limitPhrase, tunde, type IconName } from "./kit";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
 
 const DRAFT_KEY = "varu:draft";
-const INTRO_KEY = "varu:intro-seen";
-type Step = "intro" | "rule" | "tabs" | "start" | "school" | "source" | "subjects" | "timetable" | "start-counts";
-const SETUP_STEPS: Step[] = ["school", "source", "subjects", "timetable", "start-counts"];
-/** Import skips choosing subjects: they come with the timetable. */
-const flowFor = (source: SetupDraft["source"]): Step[] => (source === "manual" ? SETUP_STEPS : SETUP_STEPS.filter((x) => x !== "subjects"));
-const STEP_TITLE: Partial<Record<Step, string>> = { school: "Kool ja klass", source: "Tunniplaan", subjects: "Ained", timetable: "Tunniplaan", "start-counts": "Algseis" };
+/**
+ * Kept as short as possible: start, school + EduPage import on one screen, then "already missed?".
+ * Schools without EduPage take the longer manual path (subjects, then the weekly timetable).
+ */
+type Step = "start" | "school" | "subjects" | "timetable" | "start-counts";
+const SETUP_STEPS: Step[] = ["school", "subjects", "timetable", "start-counts"];
+const flowFor = (source: SetupDraft["source"]): Step[] => (source === "manual" ? SETUP_STEPS : ["school", "start-counts"]);
+const STEP_TITLE: Partial<Record<Step, string>> = { school: "Sinu kool", subjects: "Ained", timetable: "Tunniplaan", "start-counts": "Juba puudunud?" };
 
 const store = {
   get(k: string) {
@@ -51,7 +52,7 @@ function initial(today: string): { step: Step; draft: SetupDraft } {
   } catch {
     /* corrupted draft: start over */
   }
-  return { step: store.get(INTRO_KEY) ? "start" : "intro", draft: freshDraft(today) };
+  return { step: "start", draft: freshDraft(today) };
 }
 
 export function Onboarding({
@@ -66,7 +67,6 @@ export function Onboarding({
   const [{ step, draft }, setState] = useState(() => initial(today));
   const [counts, setCounts] = useState<Record<string, number>>({});
   const setStep = (s: Step) => {
-    if (s === "start") store.set(INTRO_KEY, "1");
     setState((v) => ({ ...v, step: s }));
     window.scrollTo({ top: 0 });
   };
@@ -79,7 +79,6 @@ export function Onboarding({
 
   const finish = (s: Setup, a?: Absence[], fresh?: boolean) => {
     store.set(DRAFT_KEY, null);
-    store.set(INTRO_KEY, "1");
     onDone(s, a, fresh);
   };
 
@@ -92,27 +91,7 @@ export function Onboarding({
       />
     );
 
-  if (step === "intro")
-    return (
-      <Welcome
-        title="Kui palju tunde võid veel puududa?"
-        features={[
-          { icon: "check", title: "Kas võid selle tunni vahele jätta?", text: "Näed iga tänase tunni kohta kohe: võid või ei." },
-          { icon: "gauge", title: "Varu igas aines", text: "Mitu tundi on igas aines alles enne kooli piiri." },
-          { icon: "calendar", title: "Plaani ette", text: "Reis või võistlus? Kontrolli enne, kas see viiks üle piiri." },
-          { icon: "lock", title: "Ainult sinu telefonis", text: "Puudumised ei lahku su seadmest. Klassiga jagad ainult tunniplaani." },
-        ]}
-        extra={<InstallHint early />}
-        primary={{ label: "Jätka", onClick: () => setStep("rule") }}
-        secondary={{ label: "Jäta vahele", onClick: () => setStep("start") }}
-      />
-    );
-
-  if (step === "rule") return <RuleIntro onNext={() => setStep("tabs")} onBack={() => setStep("intro")} />;
-
-  if (step === "tabs") return <TabsIntro onNext={() => setStep("start")} onBack={() => setStep("rule")} />;
-
-  if (step === "start") return <Start onRam9b={() => finish(ram9bTemplate())} onCode={(s) => finish(s)} onSetup={() => setStep("school")} onIntro={() => setStep("intro")} />;
+  if (step === "start") return <Start onRam9b={() => finish(ram9bTemplate())} onCode={(s) => finish(s)} onSetup={() => setStep("school")} />;
 
   const flow = flowFor(draft.source);
   const idx = Math.max(0, flow.indexOf(step));
@@ -123,9 +102,7 @@ export function Onboarding({
   const lateStart = draft.timetableFrom > draft.window.start;
 
   const next: { label: string; disabled?: boolean; onClick: () => void } =
-    step === "school"
-      ? { label: "Edasi", disabled: draft.schoolId === "custom" && !draft.schoolName.trim(), onClick: () => setStep("source") }
-      : step === "subjects"
+    step === "subjects"
         ? { label: draft.subjectNames.length ? `Edasi (${draft.subjectNames.length} ainet)` : "Vali ained", disabled: !draft.subjectNames.length, onClick: () => setStep("timetable") }
         : step === "timetable"
           ? { label: usedSubjects.length ? "Edasi" : "Lisa tunnid", disabled: !usedSubjects.length, onClick: () => setStep("start-counts") }
@@ -149,18 +126,9 @@ export function Onboarding({
         trailing={<span className="num text-[13px] text-muted pr-1">{idx + 1}/{flow.length}</span>}
       />
 
-      {step === "school" && <SchoolStep draft={draft} today={today} patch={patch} />}
-
-      {step === "source" && (
+      {step === "school" && (
         <>
-          <Lead
-            title="Tunniplaan"
-            text={
-              draft.schoolId === "ram"
-                ? "Tõmban selle RAMi EduPage'ist. Vali oma klass ja rühmad, pärast saad kõike muuta."
-                : "Kui su kool avaldab tunniplaani edupage.org-is, tõmban selle sealt. Pärast saad kõike muuta."
-            }
-          />
+          <SchoolStep draft={draft} today={today} patch={patch} />
           <EduImport
             key={draft.schoolId}
             actionLabel="Edasi"
@@ -170,7 +138,7 @@ export function Onboarding({
               const real = segments.filter((sg) => !sg.assumed);
               const current = real.find((sg) => today >= sg.start && today <= sg.end) ?? real[real.length - 1] ?? null;
               setState({
-                step: "timetable",
+                step: "start-counts",
                 draft: {
                   ...draft,
                   source: "edupage",
@@ -188,7 +156,7 @@ export function Onboarding({
               window.scrollTo({ top: 0 });
             }}
           />
-          <Section footer="Kui kool EduPage'i ei kasuta või import ei õnnestu.">
+          <Section>
             <Row
               onClick={() => {
                 setState((v) => ({ step: "subjects", draft: { ...v.draft, source: "manual", segments: undefined, currentSegId: undefined, periodTimes: undefined } }));
@@ -196,7 +164,7 @@ export function Onboarding({
               }}
               chevron
             >
-              <span className="text-accent">Loo tunniplaan käsitsi</span>
+              <span className="text-accent">Kool ei kasuta EduPage'i? Sisesta käsitsi</span>
             </Row>
           </Section>
         </>
@@ -297,7 +265,7 @@ export function Onboarding({
           )}
           <Lead
             title="Oled juba puudunud?"
-            text={today >= draft.window.start ? "Mitu tundi igas aines oled sel perioodil juba puudunud. Stuudiumis näed neid oma ülevaate kalendrist. Kui ei tea, jäta 0 ja lisa hiljem Ajaloos." : "Periood pole veel alanud, jäta kõik 0."}
+            text={today >= draft.window.start ? "Mitu tundi sel perioodil? Vaata Stuudiumist. Kui ei tea, jäta 0." : "Periood pole veel alanud, jäta kõik 0."}
           />
           <Section>
             {usedSubjects.map((s) => (
@@ -310,7 +278,7 @@ export function Onboarding({
         </>
       )}
 
-      {step !== "source" && (
+      {step !== "school" && (
       <div className="fixed inset-x-0 bottom-0 px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-6 bg-gradient-to-t from-bg via-bg to-bg/0">
         <div className="max-w-[640px] mx-auto">
           <Button size="lg" className="w-full" disabled={next.disabled} onClick={next.onClick}>
@@ -389,254 +357,109 @@ function Welcome({
   );
 }
 
-/** The rule, shown with a real example rather than explained in prose. */
-function RuleIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
-  const ram = SCHOOLS.find((s) => s.id === "ram")!.rule;
-  const total = 34;
-  const max = maxAllowed(total, ram);
-  return (
-    <div className="min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+16px)] push-in">
-      <NavBar title="" onBack={onBack} />
-      <div className="px-2 flex-1">
-        <h1 className="m-0 text-[34px] leading-[40px] font-bold">Kuidas see arvutab</h1>
-        <p className="mt-3 mb-0 text-[17px] text-muted">
-          RAMis on piir {fmtLimit(ram.limit)}: kui puudud aines {fmtLimit(ram.limit)} või rohkem tundidest, jääb hinne MH-ks, kuni õppenõukogu otsustab. Põhjendatud puudumiste korral võetakse see tavaliselt maha.
-        </p>
-
-        <div className="mt-7 bg-surface rounded-[26px] p-5">
-          <div className="flex items-baseline justify-between">
-            <span className="font-semibold">Füüsika</span>
-            <span className="text-[15px] text-muted num">{total} tundi poolaastas</span>
-          </div>
-          <div className="grid grid-cols-[repeat(17,1fr)] gap-[3px] mt-4" role="img" aria-label={`${total} tundi: ${max} võid puududa, ${max + 1}. tähendab MH`}>
-            {Array.from({ length: total }, (_, i) => (
-              <span
-                key={i}
-                className={`aspect-[3/4] rounded-[3px] ${i <= max ? "fill" : ""} ${i < max ? "bg-ok-fill" : i === max ? "bg-bad-fill beat" : "bg-surface-2"}`}
-                style={i <= max ? { animationDelay: `${400 + i * 110}ms` } : undefined}
-              />
-            ))}
-          </div>
-          <div className="rise mt-4 flex flex-col gap-1.5 text-[15px]" style={{ animationDelay: `${500 + max * 110}ms` }}>
-            <span className="flex items-center gap-2">
-              <i className="size-3 rounded-[3px] bg-ok-fill" /> {max} tundi võid puududa ({fmtLimit(ram.limit)} {total}-st on {(total / 4).toString().replace(".", ",")})
-            </span>
-            <span className="flex items-center gap-2">
-              <i className="size-3 rounded-[3px] bg-bad-fill" /> {max + 1}. puudumine = MH
-            </span>
-          </div>
-        </div>
-
-        <ul className="rise list-none p-0 mt-7 mb-0 flex flex-col gap-4 text-[15px]" style={{ animationDelay: `${700 + max * 110}ms` }}>
-          <Fact>
-            <b>Varu</b> on see, mitu tundi sul igas aines veel alles on.
-          </Fact>
-          <Fact>Paaristund võtab varu 2 tundi.</Fact>
-          <Fact>Vaheajad ja iseõpe on arvestatud, need ei loe puudumisena.</Fact>
-        </ul>
-      </div>
-      <Button size="lg" className="w-full mt-10" onClick={onNext}>
-        Selge
-      </Button>
-    </div>
-  );
-}
-
-const TOUR: { key: "overview" | "history" | "settings" | "plus"; name: string; text: string }[] = [
-  { key: "overview", name: "Täna", text: "Tänased tunnid ja kas võid neist puududa. Üks puudutus märgib puudumise. Kui tund jääb ära, märgi ka see: siis on aine tunde vähem." },
-  { key: "plus", name: "Pluss", text: "Puudumine mõnele teisele päevale, plaan mitmeks päevaks või ärajäänud tund. Nupp on üleval paremal." },
-  { key: "history", name: "Ajalugu", text: "Kõik sissekanded. Lükka vasakule, et muuta või kustutada. Siia lisad ka tunnid, mis puudusid enne äppi." },
-  { key: "settings", name: "Seaded", text: "Tunniplaan, kool ja reegel. Siit jagad tunniplaani ka klassikaaslastega." },
-];
-const TAB_ORDER = ["overview", "history", "settings"] as const;
-
-/** Where things live: the real tab bar with a highlight walking across it, and what each part is for. */
-function TabsIntro({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
-  const [active, setActive] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setActive((x) => (x + 1) % TOUR.length), 1700);
-    return () => clearInterval(t);
-  }, []);
-  const key = TOUR[active].key;
-  const tabIdx = TAB_ORDER.indexOf(key as (typeof TAB_ORDER)[number]);
-  return (
-    <div className="min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+16px)] push-in">
-      <NavBar title="" onBack={onBack} />
-      <div className="px-2 flex-1">
-        <h1 className="rise m-0 text-[34px] leading-[40px] font-bold">Kus mis on</h1>
-        <p className="rise mt-3 mb-0 text-[17px] text-muted" style={{ animationDelay: "80ms" }}>
-          All on kolm vaadet ja üleval pluss. Enamasti piisab esimesest.
-        </p>
-        <div className="rise mt-7 flex items-center gap-3" style={{ animationDelay: "160ms" }} aria-hidden>
-          <div className="glass flex-1 rounded-full p-1 grid grid-cols-3 relative">
-            <span
-              className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] rounded-full bg-surface-2 transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-              style={{ transform: `translateX(${Math.max(0, tabIdx) * 100}%)`, opacity: tabIdx < 0 ? 0 : 1 }}
-            />
-            {TAB_ORDER.map((k, i) => (
-              <div key={k} className={`relative flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full transition-colors duration-300 ${i === tabIdx ? "text-accent" : "text-ink"}`}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={i === tabIdx ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round">
-                  <path d={TAB_ICONS[k]} />
-                </svg>
-                <span className="text-[10px] font-medium leading-none">{TOUR.find((t) => t.key === k)!.name}</span>
-              </div>
-            ))}
-          </div>
-          <span className={`glass size-[62px] rounded-full grid place-items-center text-accent transition-transform duration-300 ${key === "plus" ? "scale-110" : ""}`}>
-            <Icon name="plus" size={26} stroke={2.4} />
-          </span>
-        </div>
-        <ul className="list-none p-0 mt-8 mb-0 flex flex-col gap-2">
-          {TOUR.map((t, i) => (
-            <li
-              key={t.key}
-              onClick={() => setActive(i)}
-              className={`rise flex gap-4 items-start rounded-[20px] p-3 -mx-1 transition-colors duration-300 cursor-pointer ${i === active ? "bg-surface" : ""}`}
-              style={{ animationDelay: `${260 + i * 100}ms` }}
-            >
-              <span className={`shrink-0 size-11 rounded-full grid place-items-center transition-colors duration-300 ${i === active ? "bg-accent text-accent-ink" : "bg-accent-soft text-accent"}`}>
-                {t.key === "plus" ? (
-                  <Icon name="plus" size={22} stroke={2.4} />
-                ) : (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d={TAB_ICONS[t.key]} />
-                  </svg>
-                )}
-              </span>
-              <div>
-                <div className="font-semibold text-[17px]">{t.name}</div>
-                <div className="text-[15px] text-muted leading-[20px] mt-0.5">{t.text}</div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <Button size="lg" className="rise w-full mt-8" style={{ animationDelay: "700ms" }} onClick={onNext}>
-        Alusta
-      </Button>
-    </div>
-  );
-}
-
-function Fact({ children }: { children: ReactNode }) {
-  return (
-    <li className="flex gap-3 items-start">
-      <span className="text-accent mt-0.5 shrink-0">
-        <Icon name="check" size={18} stroke={2.6} />
-      </span>
-      <span>{children}</span>
-    </li>
-  );
-}
-
-function Start({ onRam9b, onCode, onSetup, onIntro }: { onRam9b: () => void; onCode: (s: Setup) => void; onSetup: () => void; onIntro: () => void }) {
+function Start({ onRam9b, onCode, onSetup }: { onRam9b: () => void; onCode: (s: Setup) => void; onSetup: () => void }) {
+  const [codeOpen, setCodeOpen] = useState(false);
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   return (
-    <div className="flex flex-col gap-7 pt-[calc(env(safe-area-inset-top)+40px)] push-in">
-      <div className="px-2">
-        <h1 className="m-0 text-[34px] leading-[40px] font-bold">Alustame</h1>
-        <p className="mt-2 mb-0 text-[17px] text-muted">Vali, kuidas oma tunniplaani saad.</p>
+    <div className="min-h-dvh flex flex-col pt-[calc(env(safe-area-inset-top)+56px)] pb-[calc(env(safe-area-inset-bottom)+16px)] fade-in">
+      <div className="px-2 flex-1">
+        <div className="pop size-16 rounded-[18px] bg-accent text-accent-ink grid place-items-center mb-6 shadow-[0_8px_24px_-8px_var(--accent)]">
+          <Icon name="check" size={34} stroke={2.6} />
+        </div>
+        <h1 className="rise m-0 text-[34px] leading-[40px] font-bold" style={{ animationDelay: "120ms" }}>
+          Kui palju võid veel puududa?
+        </h1>
+        <p className="rise mt-3 mb-0 text-[17px] text-muted" style={{ animationDelay: "200ms" }}>
+          Näed iga tunni kohta kohe: võid või ei.
+        </p>
       </div>
-
-      <Section title="Klassikaaslane juba seadistas?" footer={err ? <span className="text-bad">{err}</span> : "Ava tema jagatud link või kleebi kood. Sinu puudumised jäävad sinu teada."}>
-        <div className="cell flex items-center gap-3 px-5 min-h-[52px]">
-          <input
-            className="cell-input font-mono text-[16px] flex-1 placeholder:text-faint placeholder:font-sans placeholder:text-[17px]"
-            enterKeyHint="go"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            aria-label="Jagamiskood või link"
-            placeholder="Kood või link"
-            value={code}
-            onChange={(e) => {
-              setCode(e.target.value);
-              setErr("");
-            }}
-          />
-          <Button
-            variant="ghost"
-            className="min-h-8 px-3"
-            disabled={!code.trim()}
-            onClick={() => {
-              const s = decodeSetup(code.trim().replace(/^.*#setup=/, ""));
-              s ? onCode(s) : setErr("See kood ei tööta. Kopeeri see uuesti tervikuna.");
-            }}
-          >
-            Lae
+      <div className="mt-8 rise" style={{ animationDelay: "300ms" }}>
+        <InstallHint early />
+      </div>
+      {codeOpen && (
+        <div className="mt-6">
+          <Section title="Klassikaaslase kood" footer={err ? <span className="text-bad">{err}</span> : undefined}>
+            <div className="cell flex items-center gap-3 pl-5 pr-2.5 min-h-[52px]">
+              <input
+                className="cell-input font-mono text-[16px] flex-1 placeholder:text-faint placeholder:font-sans placeholder:text-[17px]"
+                enterKeyHint="go"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-label="Jagamiskood või link"
+                placeholder="Kood või link"
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value);
+                  setErr("");
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0"
+                disabled={!code.trim()}
+                onClick={() => {
+                  const s = decodeSetup(code.trim().replace(/^.*#setup=/, ""));
+                  s ? onCode(s) : setErr("See kood ei tööta. Kopeeri see uuesti tervikuna.");
+                }}
+              >
+                Lae
+              </Button>
+            </div>
+          </Section>
+        </div>
+      )}
+      <div className="rise flex flex-col gap-1 mt-8" style={{ animationDelay: "380ms" }}>
+        <Button size="lg" className="w-full" onClick={onSetup}>
+          Alusta
+        </Button>
+        <div className="flex justify-center flex-wrap gap-x-2">
+          {!codeOpen && (
+            <Button variant="quiet" onClick={() => setCodeOpen(true)}>
+              Mul on kood
+            </Button>
+          )}
+          <Button variant="quiet" className="text-muted" onClick={onRam9b}>
+            RAM 9.b näidis
           </Button>
         </div>
-      </Section>
-
-      <Section title="Või seadista ise">
-        <Row onClick={onSetup} chevron>
-          <div>Seadista oma klass</div>
-          <div className="text-[13px] text-muted">Kool, klass ja tunniplaan. Kooli EduPage'ist umbes 30 sekundit.</div>
-        </Row>
-      </Section>
-
-      <div className="flex flex-wrap gap-x-2">
-        <Button variant="quiet" onClick={onIntro}>
-          Kuidas see töötab?
-        </Button>
-        <Button variant="quiet" className="text-muted" onClick={onRam9b}>
-          RAM 9.b näidis
-        </Button>
       </div>
     </div>
   );
 }
 
+/** Just the school: the class comes from EduPage, the period dates from the school (both editable in Seaded). */
 function SchoolStep({ draft, today, patch }: { draft: SetupDraft; today: string; patch: (p: Partial<SetupDraft>) => void }) {
   const school = SCHOOLS.find((s) => s.id === draft.schoolId);
   return (
-    <>
-      <Section
-        footer={
-          school
-            ? `Piir: ${limitPhrase(school.rule)}.${school.verified ? "" : " Kontrolli oma kooli hindamisjuhendist."}`
-            : `Alguses on piir ${fmtLimit(SCHOOLS[0].rule.limit)}. Muuda seda hiljem seadetes oma kooli reegli järgi.`
-        }
-      >
-        <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>Kool</span>
-          <select
-            id="ob-school"
-            className="bg-transparent border-0 text-right text-muted text-[17px] max-w-[62%]"
-            value={draft.schoolId}
-            onChange={(e) => {
-              const w = defaultWindow(today, e.target.value);
-              patch({ schoolId: e.target.value, window: w, timetableFrom: w.start });
-            }}
-          >
-            {SCHOOLS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-            <option value="custom">Muu kool</option>
-          </select>
+    <Section footer={school ? `Piir: ${limitPhrase(school.rule)}.` : `Piir alguses ${fmtLimit(SCHOOLS[0].rule.limit)}, muuda seadetes.`}>
+      <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
+        <span>Kool</span>
+        <select
+          id="ob-school"
+          className="bg-transparent border-0 text-right text-muted text-[17px] max-w-[62%]"
+          value={draft.schoolId}
+          onChange={(e) => {
+            const w = defaultWindow(today, e.target.value);
+            patch({ schoolId: e.target.value, window: w, timetableFrom: w.start });
+          }}
+        >
+          {SCHOOLS.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+          <option value="custom">Muu kool</option>
+        </select>
+      </label>
+      {draft.schoolId === "custom" && (
+        <label className="cell flex items-center px-5">
+          <input className="cell-input placeholder:text-faint" aria-label="Kooli nimi" placeholder="Kooli nimi" value={draft.schoolName} onChange={(e) => patch({ schoolName: e.target.value })} />
         </label>
-        {draft.schoolId === "custom" && (
-          <label className="cell flex items-center px-5">
-            <input className="cell-input placeholder:text-faint" aria-label="Kooli nimi" placeholder="Kooli nimi" value={draft.schoolName} onChange={(e) => patch({ schoolName: e.target.value })} />
-          </label>
-        )}
-        <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>Klass</span>
-          <input id="ob-class" className="bg-transparent border-0 text-right text-[17px] w-1/2 placeholder:text-faint" placeholder="nt 9.b" value={draft.className} onChange={(e) => patch({ className: e.target.value })} />
-        </label>
-      </Section>
-      <Section title="Arvestusperiood" footer="Täidetud selle õppeaasta järgi. Muuda, kui sinu koolil on teised kuupäevad.">
-        <label className="cell flex items-center justify-between gap-3 px-5 min-h-[52px]">
-          <span>Nimi</span>
-          <input className="bg-transparent border-0 text-right text-muted text-[17px] w-1/2" aria-label="Perioodi nimi" value={draft.window.name} onChange={(e) => patch({ window: { ...draft.window, name: e.target.value } })} />
-        </label>
-        <DateField label="Algus" value={draft.window.start} onChange={(v) => isValidISO(v) && patch({ window: { ...draft.window, start: v }, timetableFrom: v })} />
-        <DateField label="Viimane päev" min={draft.window.start} value={draft.window.end} onChange={(v) => isValidISO(v) && patch({ window: { ...draft.window, end: v } })} />
-      </Section>
-    </>
+      )}
+    </Section>
   );
 }
 

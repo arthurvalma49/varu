@@ -13,16 +13,11 @@ import { Overview } from "./ui/Overview";
 import { Settings, leaveDemo } from "./ui/Settings";
 import { ShareCard } from "./ui/ShareCard";
 import { SubjectDetail } from "./ui/SubjectDetail";
-import { Button, Icon, LargeTitle, PlusButton, Sheet, TAB_ICONS, cap, fmtDate, fmtLong, joinEt, tunde } from "./ui/kit";
+import { Button, GearButton, Icon, LargeTitle, NavBar, PlusButton, Sheet, cap, fmtDate, fmtLong, joinEt, tunde } from "./ui/kit";
 
-/** Three tabs, as in Apple's own apps; adding is a + button that opens a sheet. */
-type Tab = "overview" | "history" | "settings";
-const TITLES: Record<Tab, string> = { overview: "Täna", history: "Ajalugu", settings: "Seaded" };
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: "overview", label: "Täna", icon: TAB_ICONS.overview },
-  { id: "history", label: "Ajalugu", icon: TAB_ICONS.history },
-  { id: "settings", label: "Seaded", icon: TAB_ICONS.settings },
-];
+
+/** One main screen (Täna). Settings opens from the gear, history from inside settings. */
+type View = "overview" | "history" | "settings";
 
 function readHashSetup(): Setup | null {
   const m = location.hash.match(/#setup=([\w-]+)/);
@@ -33,7 +28,7 @@ export default function App() {
   const store = useAppData();
   const { data, setSetup, addAbsences, removeAbsence, updateAbsence, replaceAll } = store;
   const [fresh, setFresh] = useState(false);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<View>("overview");
   const [lisaOpen, setLisaOpen] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
   const [incoming, setIncoming] = useState<Setup | null>(readHashSetup);
@@ -66,7 +61,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const go = (t: Tab) => {
+  const go = (t: View) => {
     setTab(t);
     setDetail(null);
     setToast(null);
@@ -210,16 +205,11 @@ export default function App() {
       </div>
     );
 
-  const sub =
-    tab === "overview"
-      ? `${cap(fmtLong(now))}${data.setup.className ? ` · ${data.setup.className}` : ""}`
-      : tab === "settings"
-        ? undefined
-        : `${data.setup.schoolName}${data.setup.className ? ` · ${data.setup.className}` : ""}`;
+  const sub = `${cap(fmtLong(now))}${data.setup.className ? ` · ${data.setup.className}` : ""}`;
 
   return (
     <div className="min-h-dvh">
-      {tab !== "settings" && (
+      {tab === "overview" && (
         <div
           aria-hidden={!scrolled}
           className={`fixed inset-x-0 top-0 z-20 bg-bar backdrop-blur-xl shadow-[0_0.5px_0_var(--line)] pt-[env(safe-area-inset-top)] transition-opacity duration-200 motion-reduce:transition-none ${
@@ -228,13 +218,13 @@ export default function App() {
         >
           <div className="h-11 max-w-[640px] mx-auto px-4 grid grid-cols-[44px_1fr_44px] items-center">
             <span />
-            <span className="text-center font-semibold text-[17px]">{detail ? (data.setup.subjects.find((x) => x.id === detail)?.name ?? "") : TITLES[tab]}</span>
+            <span className="text-center font-semibold text-[17px]">{detail ? (data.setup.subjects.find((x) => x.id === detail)?.name ?? "") : "Täna"}</span>
             {!detail && <span className="justify-self-end"><PlusButton small onClick={() => setLisaOpen(true)} /></span>}
           </div>
         </div>
       )}
       <div id="app-main" className="min-h-dvh bg-bg">
-      <main className="max-w-[640px] mx-auto px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-32 flex flex-col gap-7">
+      <main className="max-w-[640px] mx-auto px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-16 flex flex-col gap-7">
         {store.saveError && <SaveError />}
         {data.demo && (
           <div className="flex items-center justify-between gap-3 rounded-full bg-warn-soft pl-4 pr-1.5 py-1.5 text-[15px] -mb-3">
@@ -244,9 +234,18 @@ export default function App() {
             </Button>
           </div>
         )}
-        {tab !== "settings" && !detail && (
+        {tab === "overview" && !detail && (
           <div className="-mx-4 -mb-3">
-            <LargeTitle title={TITLES[tab]} subtitle={sub} trailing={<PlusButton onClick={() => setLisaOpen(true)} />} />
+            <LargeTitle
+              title="Täna"
+              subtitle={sub}
+              trailing={
+                <div className="flex gap-2.5">
+                  <GearButton onClick={() => go("settings")} />
+                  <PlusButton onClick={() => setLisaOpen(true)} />
+                </div>
+              }
+            />
           </div>
         )}
         {incoming && (
@@ -299,7 +298,6 @@ export default function App() {
             rows={rows}
             absences={data.absences}
             now={now}
-            onLog={() => setLisaOpen(true)}
             onOpenSubject={(id) => {
               setDetail(id);
               window.scrollTo({ top: 0 });
@@ -310,8 +308,9 @@ export default function App() {
             onCancel={changeCancelled}
           />
         )}
+        {tab === "history" && <NavBar title="Ajalugu" onBack={() => go("settings")} backLabel="Seaded" />}
         {tab === "history" && <History setup={data.setup} absences={data.absences} now={now} onRemove={removed} onUpdate={updateAbsence} onImport={addAbsences} onAdd={() => setLisaOpen(true)} />}
-        {tab === "settings" && <Settings store={store} />}
+        {tab === "settings" && <Settings store={store} onBack={() => go("overview")} onOpenHistory={() => go("history")} />}
       </main>
       </div>
 
@@ -325,11 +324,6 @@ export default function App() {
           onSave={logged}
           onSaveMany={loggedMany}
           onUnlog={unlogLesson}
-          onCancel={(date, changes, label) => {
-            changeCancelled(date, changes, label);
-            setLisaOpen(false);
-            go("overview");
-          }}
         />
       </Sheet>
 
@@ -337,7 +331,7 @@ export default function App() {
         <div
           key={toast.key}
           role="status"
-          className="toast-in fixed z-20 inset-x-4 bottom-[calc(var(--tabbar-bottom)+72px)] max-w-[420px] mx-auto rounded-[24px] bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-2.5 pr-1.5 py-1.5 flex items-center gap-2.5 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
+          className="toast-in fixed z-20 inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+16px)] max-w-[420px] mx-auto rounded-[24px] bg-[#1c1c1e]/95 dark:bg-[#2c2c2e]/95 backdrop-blur-xl text-white pl-2.5 pr-1.5 py-1.5 flex items-center gap-2.5 shadow-[0_8px_30px_rgb(0_0_0/0.25)]"
         >
           <span className="shrink-0 size-6 rounded-full bg-[#30d158] text-black grid place-items-center">
             <Icon name="check" size={14} stroke={3} />
@@ -358,34 +352,6 @@ export default function App() {
         </div>
       )}
 
-      <nav className="fixed z-10 inset-x-0 bottom-(--tabbar-bottom) px-5 pointer-events-none" aria-label="Põhimenüü">
-        <div className="glass pointer-events-auto max-w-[340px] mx-auto rounded-full p-1 grid grid-cols-3 relative">
-          <span
-            aria-hidden
-            className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] rounded-full bg-surface-2 transition-transform duration-(--dur-snappy) ease-(--spring-snappy) motion-reduce:transition-none"
-            style={{ transform: `translateX(${TABS.findIndex((t) => t.id === tab) * 100}%)` }}
-          />
-          {TABS.map((t) => {
-            const on = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                aria-current={on ? "page" : undefined}
-                onClick={() => go(t.id)}
-                className={`tab-btn relative flex flex-col items-center justify-center gap-[2px] min-h-[54px] rounded-full cursor-pointer transition-colors duration-200 ${
-                  on ? "text-accent" : "text-ink"
-                }`}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d={t.icon} />
-                </svg>
-                <span className={`text-[10px] leading-none ${on ? "font-semibold" : "font-medium"}`}>{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
     </div>
   );
 }

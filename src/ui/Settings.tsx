@@ -9,7 +9,7 @@ import { demoData } from "../core/demo";
 import { emptyTimetable, slug } from "../core/templates";
 import type { AppData, Setup } from "../core/types";
 import type { Store } from "../store";
-import { ActionSheet, Button, Check, DateField, Icon, LargeTitle, NavBar, Row, Section, Segmented, SettingsIcon, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
+import { ActionSheet, Button, Check, DateField, Icon, NavBar, Row, Section, Segmented, SettingsIcon, Switch, dateRuns, fmtDate, fmtLimit, limitPhrase } from "./kit";
 import { eduSegments } from "../core/edupage";
 import { EduImport } from "./EduImport";
 import { WeekEditor } from "./WeekEditor";
@@ -35,7 +35,7 @@ const LIMITS = [
   { label: "50%", num: 1, den: 2 },
 ];
 
-export function Settings({ store }: { store: Store }) {
+export function Settings({ store, onBack, onOpenHistory }: { store: Store; onBack: () => void; onOpenHistory: () => void }) {
   const { data, updateSetup, replaceAll } = store;
   const setup = data.setup!;
   const [page, setPage] = useState<Page>("root");
@@ -51,9 +51,14 @@ export function Settings({ store }: { store: Store }) {
   if (page === "root")
     return (
       <div className={`flex flex-col gap-7 ${dir === "pop" ? "pop-in" : ""}`}>
-        <div className="-mx-4 -mb-3">
-          <LargeTitle title="Seaded" subtitle={`${setup.schoolName}${setup.className ? ` · ${setup.className}` : ""}`} />
+        <div className="-mb-4">
+          <NavBar title="Seaded" onBack={onBack} backLabel="Täna" />
         </div>
+        <Section className="[--sep-inset:62px]">
+          <Row onClick={onOpenHistory} chevron>
+            <IconLabel icon="clock">Ajalugu</IconLabel>
+          </Row>
+        </Section>
         <Section className="[--sep-inset:62px]" title="Kool">
           <Row onClick={() => open("rule")} chevron detail={<span className="num">{fmtLimit(setup.rule.limit)}</span>}>
             <IconLabel icon="building">Kool ja reegel</IconLabel>

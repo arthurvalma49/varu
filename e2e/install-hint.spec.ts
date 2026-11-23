@@ -20,7 +20,7 @@ test.describe("on an iPhone in Safari", () => {
 
 test("desktop browsers without an install prompt see no hint", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Kui palju tunde/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Kui palju võid/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Lisa avakuvale" })).toHaveCount(0);
 });
 

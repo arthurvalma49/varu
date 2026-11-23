@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { isStartingAbsence } from "../core/setup";
-import { dayCapacity, dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
-import { addDays, eachDay, weekdayOf } from "../core/dates";
-import type { Absence, Setup, SubjectRow, Weekday } from "../core/types";
-import { ActionSheet, Button, Card, Empty, Icon, Meter, Pill, Row, Section, SwipeRow, useLongPress, type SheetAction, type SwipeAction, WD_ON, WD_SHORT, cap, fmtDate, fmtLimit, joinEt, leftLabel, limitPhrase, pct, tunde } from "./kit";
+import { dayClock, dayVerdict, fractionToPct, lessonTimes, lessonsOn, minutesOf, nextLesson, nextSchoolDay, planningSegment, timetableOn } from "../core/calc";
+import { addDays, weekdayOf } from "../core/dates";
+import type { Absence, Setup, SubjectRow } from "../core/types";
+import { ActionSheet, Button, Card, Empty, Icon, Meter, Pill, Row, Section, SwipeRow, useLongPress, type SheetAction, type SwipeAction, WD_ON, cap, fmtDate, fmtLimit, joinEt, leftLabel, pct, tunde } from "./kit";
 
 /** Without bell times, the list switches from today to the next school day at this hour. */
 const SCHOOL_DAY_OVER = 15;
@@ -13,7 +13,6 @@ export function Overview({
   rows,
   absences,
   now,
-  onLog,
   onSkipDay,
   onLogLesson,
   onCancel,
@@ -24,14 +23,12 @@ export function Overview({
   rows: SubjectRow[];
   absences: Absence[];
   now: string;
-  onLog: () => void;
   onSkipDay: (date: string) => void;
   onLogLesson: (date: string, subjectId: string, count: number) => void;
   onCancel: (date: string, changes: Record<string, number>, label: string) => void;
   onOpenSubject: (subjectId: string) => void;
   onUnlogLesson: (date: string, subjectId: string, count: number) => void;
 }) {
-  const [showCalm, setShowCalm] = useState(false);
   /** The action sheet currently shown (lesson options, or which half of a double lesson). */
   const [sheet, setSheet] = useState<{ title: string; message?: string; actions: SheetAction[] } | null>(null);
 
@@ -44,8 +41,6 @@ export function Overview({
 
   const name = (id: string) => setup.subjects.find((s) => s.id === id)?.name ?? id;
   const row = (id: string) => rows.find((r) => r.subject.id === id);
-  const seg = planningSegment(setup, now);
-  const capacity = dayCapacity(setup, rows, seg);
   const limitPct = fractionToPct(setup.rule.limit) / 100;
   const mh = setup.rule.automatic ? "MH" : "üle piiri";
 
@@ -99,21 +94,7 @@ export function Overview({
 
   const graded = rows.filter((r) => !r.subject.advisory);
   const over = graded.filter((r) => r.left < 0);
-  const groups: { id: string; title: string; rows: SubjectRow[] }[] = [
-    { id: "edge", title: "Piiril", rows: graded.filter((r) => r.left <= 0) },
-    { id: "warn", title: "Jälgi", rows: graded.filter((r) => r.status === "warn") },
-    { id: "calm", title: "Rahulik", rows: graded.filter((r) => r.status === "ok") },
-    { id: "soft", title: "Vähem tähtis", rows: rows.filter((r) => r.subject.advisory) },
-  ].filter((g) => g.rows.length);
-  const calmCollapsible = graded.filter((r) => r.status === "ok").length > 5;
 
-  const schoolDaysLeft =
-    now > setup.windowEnd
-      ? 0
-      : eachDay(now > setup.windowStart ? now : setup.windowStart, setup.windowEnd).filter((d) => {
-          const w = new Date(d + "T12:00").getDay();
-          return w >= 1 && w <= 5 && !setup.holidays.includes(d);
-        }).length;
 
   return (
     <div className="flex flex-col gap-7">
@@ -179,7 +160,7 @@ export function Overview({
 
       {/* The focus day's lessons, one by one */}
       {focus && timetableOn(setup, focus).length > 0 && (
-        <Section title={`${dayWord}, ${fmtDate(focus)}`} info="Võid = selle tunni võid vahele jätta ja jääd piiri sisse. Paaristund võtab 2 tundi varu. Lükka tundi vasakule või hoia sõrme peal, et näha valikuid.">
+        <Section title={`${dayWord}, ${fmtDate(focus)}`}>
           {(() => {
             // Show the timetable as planned, with cancelled lessons crossed out (they can be restored).
             const planned = timetableOn(setup, focus);
@@ -342,92 +323,18 @@ export function Overview({
               <span className={v && v.blockers.length ? "text-bad" : "text-accent"}>{partial ? "Puudun ülejäänud tundidest" : "Puudun terve päeva"}</span>
             </Row>
           )}
-          {(() => {
-            // A visible way in for cancelled lessons (also on swipe and long press).
-            const cancelled = setup.cancelled?.[focus] ?? {};
-            const left = timetableOn(setup, focus).filter((b) => !b.selfStudy).map((b) => ({ b, n: b.count - Math.min(cancelled[b.subjectId] ?? 0, b.count) })).filter((x) => x.n > 0);
-            if (!left.length) return null;
-            const actions: SheetAction[] = left.map(({ b, n }) => {
-              const tm = lessonTimes(setup, b);
-              return { label: `${name(b.subjectId)}${tm ? `, ${tm.start}` : ""}`, onClick: () => onCancel(focus, { [b.subjectId]: n }, `${name(b.subjectId)} jääb ära.`) };
-            });
-            if (left.length > 1)
-              actions.push({
-                label: "Kõik tunnid jäävad ära",
-                bold: true,
-                onClick: () => {
-                  const all: Record<string, number> = {};
-                  for (const { b, n } of left) all[b.subjectId] = (all[b.subjectId] ?? 0) + n;
-                  onCancel(focus, all, `${dayWord} jääb ära.`);
-                },
-              });
-            return (
-              <Row onClick={() => setSheet({ title: "Mis tund jääb ära?", message: "Ärajäänud tund ei ole puudumine. Aine tundide koguarv väheneb.", actions })}>
-                <span className="text-accent">Tund jääb ära…</span>
-              </Row>
-            );
-          })()}
         </Section>
       )}
 
-      {/* Whole days per weekday */}
-      {focus && (
-      <Section title="Terveid päevi võid veel vahele jätta" footer={seg?.assumed ? "Eeldusel, et tunniplaan jääb samaks." : undefined}>
-        <div className="grid grid-cols-5 gap-1.5 p-3">
-          {([1, 2, 3, 4, 5] as Weekday[]).map((d) => {
-            const c = capacity[d];
-            const selfStudy = seg?.timetable[d]?.some((b) => b.selfStudy);
-            const tone = c === null ? "border border-dashed border-line text-muted" : c === 0 ? "bg-bad-soft text-bad" : c === 1 ? "bg-warn-soft text-warn" : "bg-surface-2";
-            return (
-              <div
-                key={d}
-                className={`rounded-[16px] py-2.5 text-center flex flex-col gap-0.5 ${tone} ${weekdayOf(now) === d ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""}`}
-              >
-                {weekdayOf(now) === d && <span className="sr-only">Täna. </span>}
-                <b className={`num leading-none ${c === null ? "text-[13px] leading-[26px] font-medium" : "text-[26px] font-semibold"}`}>
-                  {c === null ? (selfStudy ? "iseõpe" : "vaba") : c}
-                </b>
-                <span className="text-[12px] text-muted">{WD_SHORT[d]}</span>
-              </div>
-            );
-          })}
-        </div>
+      {/* Subjects: one list, least margin first; ungraded ones last */}
+      <Section title="Ained">
+        {[...graded].sort((a, b) => a.left - b.left).concat(rows.filter((r) => r.subject.advisory)).map((r) => (
+          <SubjectRowView key={r.subject.id} r={r} setup={setup} now={now} limitPct={limitPct} mh={mh} onOpen={() => onOpenSubject(r.subject.id)} />
+        ))}
       </Section>
-      )}
-
-      {/* Subjects */}
-      {groups.map((g) => {
-        const collapsed = g.id === "calm" && calmCollapsible && !showCalm;
-        const list = collapsed ? g.rows.slice(0, 4) : g.rows;
-        return (
-          <Section
-            key={g.id}
-            title={g.id === "edge" ? <span className="text-bad">{g.title}</span> : g.title}
-            info={g === groups[0] ? `${cap(limitPhrase(setup.rule))}. Protsent on kogu perioodi tundidest, joon ribal on piir. Puuduta ainet, et näha täpsemalt.` : undefined}
-          >
-            {list.map((r) => (
-              <SubjectRowView key={r.subject.id} r={r} setup={setup} now={now} limitPct={limitPct} mh={mh} onOpen={() => onOpenSubject(r.subject.id)} />
-            ))}
-            {collapsed && (
-              <Row onClick={() => setShowCalm(true)}>
-                <span className="text-accent">Näita kõiki {g.rows.length}</span>
-              </Row>
-            )}
-          </Section>
-        );
-      })}
 
       <ActionSheet open={!!sheet} onClose={() => setSheet(null)} title={sheet?.title} message={sheet?.message} actions={sheet?.actions ?? []} />
 
-      {/* The pill sits on the cards' edge, so its label (20px padding) lines up with the text above. */}
-      <div className="-mt-3 flex flex-col gap-3 text-[13px] text-muted num">
-        <span className="px-5">
-          {setup.windowName}: {schoolDaysLeft} koolipäeva veel.
-        </span>
-        <Button variant="ghost" onClick={onLog} className="self-start">
-          Kontrolli muud päeva
-        </Button>
-      </div>
     </div>
   );
 }

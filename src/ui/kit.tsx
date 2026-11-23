@@ -69,6 +69,7 @@ const ICONS = {
   trash: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13",
   pencil: "M4 20h4L19 9l-4-4L4 16v4Z",
   info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v5M12 7.5v.01",
+  clock: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
   tray: "M4 13h4l2 3h4l2-3h4M4 13l2-8h12l2 8v6H4v-6Z",
 } as const;
 export type IconName = keyof typeof ICONS;
@@ -113,6 +114,22 @@ export function PlusButton({ onClick, label = "Lisa puudumine", small }: { onCli
       className={`glass glass-btn rounded-full grid place-items-center text-accent cursor-pointer ${small ? "size-9" : "size-11"}`}
     >
       <Icon name="plus" size={small ? 20 : 24} stroke={2.4} />
+    </button>
+  );
+}
+
+/** Round glass settings (gear) button, next to + on the main screen. */
+export function GearButton({ onClick, small }: { onClick: () => void; small?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Seaded"
+      className={`glass glass-btn rounded-full grid place-items-center text-ink cursor-pointer ${small ? "size-9" : "size-11"}`}
+    >
+      <svg width={small ? 19 : 22} height={small ? 19 : 22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d={TAB_ICONS.settings} />
+      </svg>
     </button>
   );
 }
