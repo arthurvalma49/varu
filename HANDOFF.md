@@ -76,3 +76,5 @@ Known gaps:
 ## Install hint
 - `src/ui/InstallHint.tsx`: on iPhone in a browser tab (not the home-screen app) explains Jaga, then "Lisa avakuvale"; on Android uses the browser's install prompt. Shown on the first onboarding screen (says to install before setting up, since browser data does not carry over) and on Täna. "Hiljem" hides it for 7 days.
 
+
+- Vercel Web Analytics (`@vercel/analytics`, `<Analytics />` in `main.tsx`): anonymous, cookieless page views only. `beforeSend` cuts the URL hash so `#setup=` share codes are never sent. Absences never leave the device.
